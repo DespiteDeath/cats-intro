@@ -8,10 +8,10 @@ gitHeadCommitSha in ThisBuild := Process("git rev-parse HEAD").lineStream.head
 lazy val root = (project in file(".")).settings(
   inThisBuild(Seq(
     version := "0.1",
-    scalaVersion := "2.12.6",
+    scalaVersion := "2.12.8",
     organization := "org.inanme",
   )),
-  name := "Scala2_11WithCats",
+  name := "cats-intro",
   scalacOptions ++= Seq(
     //A -X option suggests permanence, while a -Y could disappear at any time
     "-encoding", "UTF-8", // source files are in UTF-8
@@ -31,7 +31,8 @@ lazy val root = (project in file(".")).settings(
     "-Yrepl-sync"
   ),
   libraryDependencies ++= Seq(
-    "org.typelevel" %% "cats-core" % "1.2.0"
+    "org.typelevel" %% "cats-core" % "1.6.0",
+    "org.typelevel" %% "cats-effect" % "1.2.0"
   ),
   makeVersionProperties := {
     val propFile = (resourceManaged in Compile).value / "version.properties"
