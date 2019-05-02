@@ -24,7 +24,7 @@ lazy val root = (project in file(".")).settings(
     "-language:implicitConversions", // Allow definition of implicit functions called views
     "-language:existentials", // Existential types (besides wildcard types) can be written and inferred
     "-language:reflectiveCalls",
-    "-Xlint", // enable handy linter warnings
+    //"-Xlint", // enable handy linter warnings
     //"-Xfatal-warnings", // turn compiler warnings into errors
     "-Ypartial-unification", // allow the compiler to unify type constructors of different arities
     "-Yrangepos",
