@@ -5,6 +5,8 @@ val makeVersionProperties = taskKey[Seq[File]]("Creates a version.properties fil
 
 gitHeadCommitSha in ThisBuild := Process("git rev-parse HEAD").lineStream.head
 
+cancelable in Global := true
+
 lazy val root = (project in file(".")).settings(
   inThisBuild(Seq(
     version := "0.1",
@@ -32,7 +34,9 @@ lazy val root = (project in file(".")).settings(
   ),
   libraryDependencies ++= Seq(
     "org.typelevel" %% "cats-core" % "1.6.0",
-    "org.typelevel" %% "cats-effect" % "1.2.0"
+    "org.typelevel" %% "cats-effect" % "1.2.0",
+    "co.fs2" %% "fs2-core" % "1.0.4",
+    "co.fs2" %% "fs2-io" % "1.0.4"
   ),
   makeVersionProperties := {
     val propFile = (resourceManaged in Compile).value / "version.properties"

@@ -1,33 +1,33 @@
 package example
 
-import scala.concurrent._, scala.util._
-import cats._, cats.data._, cats.implicits._, cats.effect._
+import java.util.concurrent.TimeUnit
 
-object EffectsMain extends App {
+import scala.concurrent._
+import cats.implicits._
+import cats.effect._
+
+object EffectsMain extends IOApp {
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
-  val start = System.currentTimeMillis()
-  val one = IO[Int] {
-    Thread.sleep(2000L)
-    2
-  }
-  val two = IO[Int] {
-    Thread.sleep(3000L)
-    3
-  }
+  val compute: IO[Long] = {
 
-  val m = IO((x: Int, y: Int) => x + y)
-  val t = (one, two).parMapN {
-    case (m, n) => m + n
-  }
+    def makeIO(r: Long) = IO[Long] {
+      TimeUnit.SECONDS.sleep(r)
+      r
+    }
 
-  t.unsafeRunAsync {
-    case Left(x) =>
-      x.printStackTrace()
-    case Right(x) =>
-      println(s"${System.currentTimeMillis() - start} finished $x")
+    val two = makeIO(2)
+    val three = makeIO(3)
+
+    (two, three).parMapN {
+      case (m, n) => m + n
+    }
+
   }
 
-  Thread.sleep(6000L)
+  val now: IO[Long] = IO[Long](System.currentTimeMillis())
 
+  override def run(args: List[String]): IO[ExitCode] =
+    now.bracket(_ => compute)(start => now.map(_ - start).map(println))
+      .handleErrorWith(e => IO(e.printStackTrace())).as(ExitCode.Success)
 }
