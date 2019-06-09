@@ -8,6 +8,7 @@ gitHeadCommitSha in ThisBuild := Process("git rev-parse HEAD").lineStream.head
 cancelable in Global := true
 
 lazy val root = (project in file(".")).settings(
+  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.1"),
   inThisBuild(Seq(
     version := "0.1",
     scalaVersion := "2.12.8",
@@ -34,6 +35,7 @@ lazy val root = (project in file(".")).settings(
   ),
   libraryDependencies ++= Seq(
     "org.typelevel" %% "cats-core" % "1.6.0",
+    "org.typelevel" %% "cats-free" % "1.6.0",
     "org.typelevel" %% "cats-effect" % "1.2.0",
     "co.fs2" %% "fs2-core" % "1.0.4",
     "co.fs2" %% "fs2-io" % "1.0.4"
