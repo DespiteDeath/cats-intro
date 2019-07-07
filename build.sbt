@@ -8,7 +8,7 @@ gitHeadCommitSha in ThisBuild := Process("git rev-parse HEAD").lineStream.head
 cancelable in Global := true
 
 lazy val root = (project in file(".")).settings(
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.1"),
+  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3"),
   inThisBuild(Seq(
     version := "0.1",
     scalaVersion := "2.12.8",
@@ -34,11 +34,11 @@ lazy val root = (project in file(".")).settings(
     "-Yrepl-sync"
   ),
   libraryDependencies ++= Seq(
-    "org.typelevel" %% "cats-core" % "1.6.0",
-    "org.typelevel" %% "cats-free" % "1.6.0",
-    "org.typelevel" %% "cats-effect" % "1.2.0",
-    "co.fs2" %% "fs2-core" % "1.0.4",
-    "co.fs2" %% "fs2-io" % "1.0.4"
+    "org.typelevel" %% "cats-core" % "1.6.1",
+    "org.typelevel" %% "cats-free" % "1.6.1",
+    "org.typelevel" %% "cats-effect" % "1.3.1",
+    "co.fs2" %% "fs2-core" % "1.0.5",
+    "co.fs2" %% "fs2-io" % "1.0.5"
   ),
   makeVersionProperties := {
     val propFile = (resourceManaged in Compile).value / "version.properties"
