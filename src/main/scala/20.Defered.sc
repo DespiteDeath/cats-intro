@@ -11,9 +11,7 @@ def start(d: Deferred[IO, Int]): IO[Unit] = {
     List(
       //both try to complete
       IO.race(attemptCompletion(1), attemptCompletion(2)),
-      d.get.flatMap { n =>
-        IO(println(show"Result: $n"))
-      }
+      d.get.flatMap(n => IO(println(show"Result: $n")))
     ).parSequence.void
   }
 

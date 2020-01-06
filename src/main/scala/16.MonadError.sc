@@ -1,5 +1,5 @@
 import scala.concurrent._
-import scala.util.{Either, _}
+import scala.util.{ Either, _ }
 import cats._
 import cats.data._
 import cats.implicits._
@@ -52,11 +52,12 @@ object MyEitherStore1 extends Store[MyEither] {
 
 object ConfigurationStorage {
 
-  def fromStore[F[_] : Monad](store: Store[F], path: Path)
-                             (implicit me: MonadError[F, Throwable]): F[Configuration] =
+  def fromStore[F[_]: Monad](store: Store[F], path: Path)(
+      implicit me: MonadError[F, Throwable]
+  ): F[Configuration] =
     store.read(path).flatMap { string =>
       parseConfiguration(string) match {
-        case Failure(t) => me.raiseError(t)
+        case Failure(t)             => me.raiseError(t)
         case Success(configuration) => me.point(configuration)
       }
     }

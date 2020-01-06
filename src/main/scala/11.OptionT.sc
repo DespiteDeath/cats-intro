@@ -6,16 +6,16 @@ implicit val cte = ExecutionContext.fromExecutor(_.run())
 type FOI = Future[Option[Int]]
 
 def reduce(test: String, x: FOI, y: FOI): Unit = {
-  val z: OptionT[Future, Int] = for {
-    x <- OptionT(x)
-    y <- OptionT(y)
-  } yield x + y
-  z.value onComplete {
-    case Success(Some(r)) => println(s"$test : $r")
-    case Success(None) => println(s"$test None")
-    case Failure(_) => println(s"$test Exception")
+    val z: OptionT[Future, Int] = for {
+      x <- OptionT(x)
+      y <- OptionT(y)
+    } yield x + y
+    z.value onComplete {
+      case Success(Some(r)) => println(s"$test : $r")
+      case Success(None)    => println(s"$test None")
+      case Failure(_)       => println(s"$test Exception")
+    }
   }
-}
 
 val ex = new RuntimeException
 reduce("test0", Future(Some(1)), Future(Some(2)))

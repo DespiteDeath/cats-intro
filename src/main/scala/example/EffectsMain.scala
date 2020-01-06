@@ -17,11 +17,11 @@ object EffectsMain extends IOApp {
 
   }
 
-  val now: IO[Long] = IO[Long](System.currentTimeMillis())
-
   override def run(args: List[String]): IO[ExitCode] =
     now
-      .bracket(_ => compute)(start => now.map(_ - start).map(println))
+      .bracket(_ => compute)(start =>
+        now.map(_ - start).flatMap(duration => putStrLine[IO](duration.toString))
+      )
       .handleErrorWith(e => IO(e.printStackTrace()))
       .as(ExitCode.Success)
 }

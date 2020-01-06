@@ -8,10 +8,10 @@ gitHeadCommitSha in ThisBuild := Process("git rev-parse HEAD").lineStream.head
 cancelable in Global := true
 
 lazy val root = (project in file(".")).settings(
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3"),
+  addCompilerPlugin("org.typelevel" % "kind-projector_2.13.2" % "0.11.0"),
   inThisBuild(Seq(
     version := "0.1",
-    scalaVersion := "2.12.8",
+    scalaVersion := "2.13.2",
     organization := "org.inanme",
   )),
   name := "cats-intro",
@@ -29,16 +29,15 @@ lazy val root = (project in file(".")).settings(
     "-language:reflectiveCalls",
     //"-Xlint", // enable handy linter warnings
     //"-Xfatal-warnings", // turn compiler warnings into errors
-    "-Ypartial-unification", // allow the compiler to unify type constructors of different arities
     "-Yrangepos",
-    "-Yrepl-sync"
   ),
   libraryDependencies ++= Seq(
-    "org.typelevel" %% "cats-core" % "1.6.1",
-    "org.typelevel" %% "cats-free" % "1.6.1",
-    "org.typelevel" %% "cats-effect" % "1.3.1",
-    "co.fs2" %% "fs2-core" % "1.0.5",
-    "co.fs2" %% "fs2-io" % "1.0.5"
+    "org.typelevel" %% "cats-core" % "2.1.1" withSources(),
+    "org.typelevel" %% "cats-free" % "2.1.1" withSources(),
+    "org.typelevel" %% "cats-effect" % "2.1.3" withSources(),
+    "co.fs2" %% "fs2-core" % "2.3.0" withSources(),
+    "co.fs2" %% "fs2-io" % "2.3.0" withSources(),
+    "org.typelevel" %% "cats-tagless-macros" % "0.11" withSources()
   ),
   makeVersionProperties := {
     val propFile = (resourceManaged in Compile).value / "version.properties"
@@ -48,10 +47,3 @@ lazy val root = (project in file(".")).settings(
   },
   resourceGenerators in Compile += makeVersionProperties,
 )
-
-
-
-
-
-
-
