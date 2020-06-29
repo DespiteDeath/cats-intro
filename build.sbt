@@ -30,6 +30,7 @@ lazy val root = (project in file(".")).settings(
     //"-Xlint", // enable handy linter warnings
     //"-Xfatal-warnings", // turn compiler warnings into errors
     "-Yrangepos",
+    "-Ymacro-annotations"
   ),
   libraryDependencies ++= Seq(
     "org.typelevel" %% "cats-core" % "2.1.1" withSources(),
@@ -37,7 +38,8 @@ lazy val root = (project in file(".")).settings(
     "org.typelevel" %% "cats-effect" % "2.1.3" withSources(),
     "co.fs2" %% "fs2-core" % "2.3.0" withSources(),
     "co.fs2" %% "fs2-io" % "2.3.0" withSources(),
-    "org.typelevel" %% "cats-tagless-macros" % "0.11" withSources()
+    "org.typelevel" %% "cats-tagless-macros" % "0.11" withSources(),
+    "org.typelevel" %% "simulacrum" % "1.0.0" withSources()
   ),
   makeVersionProperties := {
     val propFile = (resourceManaged in Compile).value / "version.properties"
