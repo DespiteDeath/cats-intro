@@ -17,3 +17,8 @@ IO.never *> IO(println("done"))
 
 implicit val errorOrFirst: List ~> Option = λ[List ~> Option](_.headOption)
 errorOrFirst(List(199))
+
+
+val map1 = Map("a" -> 1, "b" -> 2)
+val map2 = Map("b" -> 3, "d" -> 4)
+map1 |+| map2
