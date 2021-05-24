@@ -1,9 +1,7 @@
 import cats.effect.IO
-import cats.effect.concurrent.Deferred
+import cats.effect.kernel.Deferred
+import cats.effect.unsafe.implicits.global
 import cats.implicits._
-import scala.concurrent.ExecutionContext
-
-implicit val cs = IO.contextShift(ExecutionContext.global)
 
 def start(d: Deferred[IO, Int]): IO[Unit] = {
     val attemptCompletion: Int => IO[Unit] = n => d.complete(n).attempt.void

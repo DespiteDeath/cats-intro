@@ -1,41 +1,28 @@
 package example
 
-import cats.effect.{ Blocker, ExitCode, IO, IOApp, Resource }
-import cats.implicits._
+import cats.effect._
 import fs2.{ Stream, io, text }
+
 import java.nio.file.Paths
-import java.util.concurrent.Executors
 
-import scala.concurrent.{ ExecutionContext, ExecutionContextExecutorService }
+object Converter extends IOApp.Simple {
 
-object Converter extends IOApp {
+  val converter: Stream[IO, Unit] = {
+    def fahrenheitToCelsius(f: Double): Double = (f - 32.0) * (5.0 / 9.0)
 
-  private val blockingExecutionContext: Resource[IO, ExecutionContextExecutorService] =
-    Resource.make(IO(ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(2))))(ec =>
-      IO(ec.shutdown())
-    )
-
-  val converter: Stream[IO, Unit] = Stream.resource(blockingExecutionContext).flatMap {
-    blockingEC =>
-      def fahrenheitToCelsius(f: Double): Double = (f - 32.0) * (5.0 / 9.0)
-
-      io.file
-        .readAll[IO](
-          Paths.get("testdata/fahrenheit.txt"),
-          Blocker.liftExecutorService(blockingEC),
-          4096
-        )
-        .through(text.utf8Decode)
-        .through(text.lines)
-        .filter(s => s.trim.nonEmpty && !s.startsWith("//"))
-        .map(line => fahrenheitToCelsius(line.toDouble).toString)
-        .intersperse("\n")
-        .through(text.utf8Encode)
-        .through(
-          io.file
-            .writeAll(Paths.get("testdata/celsius.txt"), Blocker.liftExecutorService(blockingEC))
-        )
+    io.file
+      .Files[IO]
+      .readAll(Paths.get("testdata/fahrenheit.txt"), 4096)
+      .through(text.utf8Decode)
+      .through(text.lines)
+      .filter(s => s.trim.nonEmpty && !s.startsWith("//"))
+      .map(line => fahrenheitToCelsius(line.toDouble).toString)
+      .intersperse("\n")
+      .through(text.utf8Encode)
+      .through(
+        io.file.Files[IO].writeAll(Paths.get("testdata/celsius.txt"))
+      )
   }
 
-  def run(args: List[String]): IO[ExitCode] = converter.compile.drain.as(ExitCode.Success)
+  def run: IO[Unit] = converter.compile.drain
 }

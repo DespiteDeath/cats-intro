@@ -1,14 +1,13 @@
 package example
 
-
 import cats.effect._
-import cats.effect.syntax.all._
-import cats.effect.ExitCase._
 import cats.implicits._
-import java.net._
-import java.io._
+import cats.effect.implicits._
 
-object ClientServer extends IOApp {
+import java.io._
+import java.net._
+
+object ClientServerUncancelable extends IOApp {
   def echoProtocol[F[_]: Sync](clientSocket: Socket): F[Unit] = {
 
     def loop(reader: BufferedReader, writer: BufferedWriter): F[Unit] =
@@ -26,12 +25,12 @@ object ClientServer extends IOApp {
 
     def reader(clientSocket: Socket): Resource[F, BufferedReader] =
       Resource.make {
-        Sync[F].delay(new BufferedReader(new InputStreamReader(clientSocket.getInputStream())))
+        Sync[F].delay(new BufferedReader(new InputStreamReader(clientSocket.getInputStream)))
       }(reader => Sync[F].delay(reader.close()).handleErrorWith(_ => Sync[F].unit))
 
     def writer(clientSocket: Socket): Resource[F, BufferedWriter] =
       Resource.make {
-        Sync[F].delay(new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())))
+        Sync[F].delay(new BufferedWriter(new PrintWriter(clientSocket.getOutputStream)))
       }(writer => Sync[F].delay(writer.close()).handleErrorWith(_ => Sync[F].unit))
 
     def readerWriter(clientSocket: Socket): Resource[F, (BufferedReader, BufferedWriter)] =
@@ -46,36 +45,26 @@ object ClientServer extends IOApp {
     }
   }
 
-  def serve[F[_]: Concurrent](serverSocket: ServerSocket): F[Unit] = {
-    def close(socket: Socket): F[Unit] =
-      Sync[F].delay(socket.close()).handleErrorWith(_ => Sync[F].unit)
+  def close[F[_]: Sync](socket: ServerSocket): F[Unit] =
+    Sync[F].delay(socket.close()).handleErrorWith(_ => Sync[F].unit)
 
-    for {
-      _ <- Sync[F]
-        .delay(serverSocket.accept())
-        .bracketCase { socket =>
-          echoProtocol(socket)
-            .guarantee(close(socket)) // Ensuring socket is closed
-            .start                    // Will run in its own Fiber!
-        } { (socket, exit) =>
-          exit match {
-            case Completed           => Sync[F].unit
-            case Error(_) | Canceled => close(socket)
-          }
-        }
-      _ <- serve(serverSocket) // Looping back to the beginning
-    } yield ()
+  def close[F[_]: Sync](socket: Socket): F[Unit] =
+    Sync[F].delay(socket.close()).handleErrorWith(_ => Sync[F].unit)
+
+  def serve[F[_]: Async](serverSocket: ServerSocket): F[Unit] = {
+    val handler: F[Unit] = MonadCancel[F] uncancelable { poll =>
+      poll(Async[F].delay(serverSocket.accept())) flatMap { conn =>
+        echoProtocol[F](conn).guarantee(close[F](conn)).start.void
+      }
+    }
+
+    handler.foreverM
   }
 
-  def run(args: List[String]): IO[ExitCode] = {
-
-    def close[F[_]: Sync](socket: ServerSocket): F[Unit] =
-      Sync[F].delay(socket.close()).handleErrorWith(_ => Sync[F].unit)
-
+  def run(args: List[String]): IO[ExitCode] =
     IO(new ServerSocket(args.headOption.map(_.toInt).getOrElse(5432)))
       .bracket(serverSocket => serve[IO](serverSocket) >> IO.pure(ExitCode.Success)) {
         serverSocket => close[IO](serverSocket) >> IO(println("Server finished"))
       }
-  }
 
 }
