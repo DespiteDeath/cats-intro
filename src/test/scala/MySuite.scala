@@ -1,7 +1,10 @@
-class MySuite extends munit.FunSuite {
-  test("hello") {
-    val obtained = 42
-    val expected = 43
-    assertEquals(obtained, expected)
+import cats.effect.{IO, SyncIO}
+import munit.CatsEffectSuite
+
+class ExampleSuite extends CatsEffectSuite {
+  test("make sure IO computes the right result") {
+    IO.pure(1).map(_ + 2) flatMap { result =>
+      IO(assertEquals(result, 3))
+    }
   }
 }

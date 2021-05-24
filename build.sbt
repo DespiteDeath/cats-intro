@@ -11,7 +11,8 @@ testFrameworks += new TestFramework("munit.Framework")
 
 lazy val root = (project in file(".")).settings(
   addCompilerPlugin("org.typelevel" % "kind-projector_2.13.6" % "0.13.0"),
-  inThisBuild(
+  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
+    inThisBuild(
     Seq(
       version := "0.1",
       scalaVersion := "2.13.6",
