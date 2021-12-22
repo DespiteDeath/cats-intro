@@ -1,3 +1,4 @@
+import scala.language.postfixOps
 import scala.sys.process.Process
 
 val gitHeadCommitSha = taskKey[String]("Determines the current git commit SHA")
@@ -11,8 +12,8 @@ testFrameworks += new TestFramework("munit.Framework")
 
 lazy val root = (project in file(".")).settings(
   addCompilerPlugin("org.typelevel" % "kind-projector_2.13.6" % "0.13.0"),
-  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
-    inThisBuild(
+  addCompilerPlugin("com.olegpy"   %% "better-monadic-for"    % "0.3.1"),
+  inThisBuild(
     Seq(
       version := "0.1",
       scalaVersion := "2.13.6",
@@ -41,25 +42,29 @@ lazy val root = (project in file(".")).settings(
       "-Ymacro-annotations"
     ),
   libraryDependencies ++= Seq(
-      "org.typelevel"              %% "cats-core"                 % "2.6.1" withSources,
-      "org.typelevel"              %% "cats-free"                 % "2.6.1" withSources,
-      "org.typelevel"              %% "cats-effect"               % "3.1.1" withSources,
-      "org.typelevel"              %% "cats-effect-std"           % "3.1.1" withSources,
-      "org.typelevel"              %% "cats-effect-kernel"        % "3.1.1" withSources,
-      "org.typelevel"              %% "cats-effect-testkit"       % "3.1.1"   % Test withSources,
-      "co.fs2"                     %% "fs2-core"                  % "3.0.3" withSources,
-      "co.fs2"                     %% "fs2-io"                    % "3.0.3" withSources,
+      "org.typelevel"              %% "cats-core"                 % "2.7.0" withSources,
+      "org.typelevel"              %% "cats-free"                 % "2.7.0" withSources,
+      "org.typelevel"              %% "cats-effect"               % "3.3.1" withSources,
+      "org.typelevel"              %% "cats-effect-std"           % "3.3.1" withSources,
+      "org.typelevel"              %% "cats-effect-kernel"        % "3.3.1" withSources,
+      "org.typelevel"              %% "cats-effect-testkit"       % "3.3.1"   % Test withSources,
+      "co.fs2"                     %% "fs2-core"                  % "3.2.3" withSources,
+      "co.fs2"                     %% "fs2-io"                    % "3.2.3" withSources,
       "org.typelevel"              %% "cats-tagless-macros"       % "0.14.0" withSources,
       "org.typelevel"              %% "simulacrum"                % "1.0.1" withSources,
       "org.scalatest"              %% "scalatest"                 % "3.2.9"   % Test withSources,
       "org.scalatestplus"          %% "scalacheck-1-14"           % "3.2.2.0" % Test withSources,
-      "org.mockito"                 % "mockito-core"              % "3.10.0"  % Test withSources,
-      "org.mockito"                %% "mockito-scala"             % "1.16.37" % Test withSources,
-      "org.scalacheck"             %% "scalacheck"                % "1.14.3"  % Test withSources,
-      "org.typelevel"              %% "scalacheck-effect"         % "1.0.2"   % Test withSources,
-      "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % "1.2.5"   % Test withSources,
-      "org.scalameta"              %% "munit"                     % "0.7.26"  % Test withSources,
-      "org.typelevel"              %% "munit-cats-effect-3"       % "1.0.3"   % Test withSources
+      "org.mockito"                 % "mockito-core"              % "4.2.0"   % Test withSources,
+      "org.mockito"                %% "mockito-scala"             % "1.16.49" % Test withSources,
+      "org.scalacheck"             %% "scalacheck"                % "1.15.4"  % Test withSources,
+      "org.typelevel"              %% "scalacheck-effect"         % "1.0.3"   % Test withSources,
+      "com.github.alexarchambault" %% "scalacheck-shapeless_1.15" % "1.3.0"   % Test withSources,
+      "org.scalameta"              %% "munit"                     % "0.7.28"  % Test withSources,
+      "org.typelevel"              %% "munit-cats-effect-3"       % "1.0.6"   % Test withSources,
+      "org.http4s"                 %% "http4s-dsl"                % "0.23.7" withSources,
+      "org.http4s"                 %% "http4s-blaze-server"       % "0.23.6" withSources,
+      "org.http4s"                 %% "http4s-blaze-client"       % "0.23.6" withSources,
+      "com.chuusai"                %% "shapeless"                 % "2.3.7" withSources
     ),
   makeVersionProperties := {
     val propFile = (Compile / resourceManaged).value / "version.properties"
