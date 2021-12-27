@@ -43,24 +43,22 @@ object MyFutureStore1 extends Store[Future] {
 type MyEither[T] = Either[Throwable, T]
 
 object MyEitherStore extends Store[MyEither] {
-  override def read(path: Path) = Right("config")
+  override def read(path: Path): MyEither[String] = Right("config")
 }
 
 object MyEitherStore1 extends Store[MyEither] {
-  override def read(path: Path) = Left(new RuntimeException("File not found"))
+  override def read(path: Path): MyEither[String] = Left(new RuntimeException("File not found"))
 }
 
 object ConfigurationStorage {
 
-  def fromStore[F[_]: Monad](store: Store[F], path: Path)(
-      implicit me: MonadError[F, Throwable]
+  def fromStore[F[_]: Monad](store: Store[F], path: Path)(implicit
+      me: MonadError[F, Throwable]
   ): F[Configuration] =
-    store.read(path).flatMap { string =>
-      parseConfiguration(string) match {
-        case Failure(t)             => me.raiseError(t)
-        case Success(configuration) => me.point(configuration)
-      }
-    }
+    for {
+      string        <- store.read(path)
+      configuration <- parseConfiguration(string).fold(me.raiseError, me.pure)
+    } yield configuration
 
   def parseConfiguration(config: String): Try[Configuration] = Try(Configuration(config))
 }

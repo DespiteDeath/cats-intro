@@ -1,5 +1,0 @@
-package misc
-
-object Misc {
-
-}

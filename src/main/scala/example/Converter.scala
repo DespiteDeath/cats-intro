@@ -1,9 +1,8 @@
 package example
 
 import cats.effect._
+import fs2.io.file.{ Flags, Path }
 import fs2.{ Stream, io, text }
-
-import java.nio.file.Paths
 
 object Converter extends IOApp.Simple {
 
@@ -12,15 +11,15 @@ object Converter extends IOApp.Simple {
 
     io.file
       .Files[IO]
-      .readAll(Paths.get("testdata/fahrenheit.txt"), 4096)
-      .through(text.utf8Decode)
+      .readAll(Path("testdata/fahrenheit.txt"), 4096, Flags.Read)
+      .through(text.utf8.decode)
       .through(text.lines)
       .filter(s => s.trim.nonEmpty && !s.startsWith("//"))
       .map(line => fahrenheitToCelsius(line.toDouble).toString)
       .intersperse("\n")
-      .through(text.utf8Encode)
+      .through(text.utf8.encode)
       .through(
-        io.file.Files[IO].writeAll(Paths.get("testdata/celsius.txt"))
+        io.file.Files[IO].writeAll(Path("testdata/celsius.txt"), Flags.Write)
       )
   }
 
