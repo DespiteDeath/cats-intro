@@ -2,15 +2,15 @@ package example
 
 import cats.data._
 import cats.implicits._
-import example.ShoppingCartStore.Done
 
 import scala.util.control.NoStackTrace
 
-case object Done extends Done
+sealed trait Done
+final case object Done extends Done
 
 case class Product(id: String, quantity: Int)
 case class ShoppingCart(id: String, products: List[Product] = List.empty)
-case class ShoppingCarExists(id: String) extends Throwable with NoStackTrace
+case class ShoppingCartExists(id: String) extends Throwable with NoStackTrace
 
 trait ShoppingCartStore[F[_]] {
   def create(id: String): F[ShoppingCartStore.CreateResult]
@@ -20,9 +20,7 @@ trait ShoppingCartStore[F[_]] {
 object ShoppingCartStore {
 
   def apply[F[_]](implicit ev: ShoppingCartStore[F]): ShoppingCartStore[F] = ev
-
-  trait Done
-  type CreateResult = ShoppingCarExists Either Done
+  type CreateResult = ShoppingCartExists Either Done
 
   object mapstore {
     type Store           = Map[String, ShoppingCart]
@@ -38,7 +36,7 @@ object ShoppingCartStore {
 
         def mayBeCreate(mayBeShoppingCart: Option[ShoppingCart]): StateBackend[CreateResult] =
           mayBeShoppingCart match {
-            case Some(_) => State.inspect(_ => Either.left(ShoppingCarExists(id)))
+            case Some(_) => State.inspect(_ => Either.left(ShoppingCartExists(id)))
             case None    => create.inspect(_ => Either.right(Done))
           }
 

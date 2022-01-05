@@ -67,7 +67,8 @@ lazy val root = (project in file(".")).settings(
       "com.chuusai"                %% "shapeless"                 % "2.3.7" withSources,
       "io.circe"                   %% "circe-core"                % "0.14.1" withSources,
       "io.circe"                   %% "circe-generic"             % "0.14.1" withSources,
-      "io.circe"                   %% "circe-parser"              % "0.14.1" withSources
+      "io.circe"                   %% "circe-parser"              % "0.14.1" withSources,
+      "com.ringcentral"            %% "cassandra4io"              % "0.1.10" withSources
     ),
   makeVersionProperties := {
     val propFile = (Compile / resourceManaged).value / "version.properties"

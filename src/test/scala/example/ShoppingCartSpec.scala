@@ -23,7 +23,7 @@ class ShoppingCartSpec extends CatsSuite with OptionValues with EitherValues {
         .value
 
       store.keys should contain(shoppingCartId)
-      created2.left.value should be(ShoppingCarExists(shoppingCartId))
+      created2.left.value should be(ShoppingCartExists(shoppingCartId))
     }
   }
 
