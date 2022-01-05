@@ -1,20 +1,23 @@
 package misc
 
-import cats._
-import cats.implicits._
-import cats.data._
 import cats.effect._
-import cats.effect.implicits._
-
-import scala.concurrent.duration._
-import scala.util.control.NoStackTrace
+import cats.{ Monad, MonadError }
 
 object main41 extends IOApp.Simple {
 
-  override def run: IO[Unit] =
-    for {
-      printLoop1 <- (IO.println("Hello") >> IO.sleep(100 millis)).foreverM.start
-      printLoop2 <- (IO.println("world") >> IO.sleep(150 millis)).foreverM.start
-      _          <- IO.sleep(3 seconds) >> printLoop1.cancel >> printLoop2.cancel
-    } yield ExitCode.Success
+  def s = {
+    val t1 = MonadError[IO, Throwable]
+    val t2 = Concurrent[IO]
+    val t3 = Sync[IO]
+    ()
+  }
+
+  def m[F[_]](implicit me: Async[F]) = {
+    val kk = Monad[F]
+    ???
+  }
+
+  val t = m[IO]
+
+  override def run: IO[Unit] = IO.println("running")
 }

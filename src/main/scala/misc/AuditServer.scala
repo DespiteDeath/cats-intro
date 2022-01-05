@@ -1,5 +1,6 @@
 package misc
 
+import cats._
 import cats.effect._
 import cats.syntax.all._
 import com.datastax.oss.driver.api.core.CqlSession
@@ -21,8 +22,8 @@ import scala.jdk.DurationConverters._
 final case class Model(id: Int, data: String)
 
 object Model {
-  implicit val modelDecoder: Decoder[Model]          = deriveDecoder[Model]
-  implicit val modelEncoder: Encoder.AsObject[Model] = deriveEncoder[Model]
+  implicit val modelDecoder: Decoder[Model] = deriveDecoder[Model]
+  implicit val modelEncoder: Encoder[Model] = deriveEncoder[Model]
   implicit def entityDecoder[F[_]: Concurrent]: EntityDecoder[F, Model] =
     accumulatingJsonOf[F, Model]
   implicit def entityEncoder[F[_]]: EntityEncoder[F, Model] = jsonEncoderOf[F, Model]
@@ -41,7 +42,7 @@ object Dao {
   private val selectQuery =
     cqlt"select id, data from table where id = ${Put[Int]}".as[Model]
 
-  def apply[F[_]: Async](session: CassandraSession[F]): F[Dao[F]] =
+  def apply[F[_]: Sync](session: CassandraSession[F]): F[Dao[F]] =
     for {
       insert <- insertQuery.prepare(session)
       select <- selectQuery.prepare(session)
@@ -66,18 +67,27 @@ object AuditServer extends IOApp {
 
   val daoIO: IO[Dao[IO]] = makeSession[IO].use(session => Dao[IO](session))
 
-  def helloWorldService[F[_]]: HttpApp[IO] =
+//  so, the general trick is: when you get that error, you need to pick the typeclasses which is further down the hierarchy that extends from the ones you need
+//  so, you don't need both MonadError and Concurrent, just Concurrent
+//    and you don't need Concurrent and Sync, you need Async
+//  basically just F[_]: Async should do
+//btw, if you need Clock and Concurrent, should you ask for Temporal?
+  def helloWorldService[F[_]: Async](
+      daoF: F[Dao[F]]
+  ): HttpApp[F] =
     HttpRoutes
-      .of[IO] {
+      .of[F] {
         case request @ POST -> Root / "login" =>
-          val response = for {
-            dao      <- daoIO
+          implicit val m = Model.entityEncoder[F]
+          val response: F[Response[F]] = for {
+            dao      <- daoF
             model    <- request.as[Model]
             _        <- dao.put(model)
-            response <- Created(model)
+            response <- Applicative[F].pure(Response(status = Status.Created).withEntity(model))
           } yield response
           response.handleErrorWith(error =>
-            IO.blocking(error.printStackTrace()) >> IO.raiseError(error)
+            Sync[F].blocking(error.printStackTrace()) >> MonadError[F, Throwable]
+              .raiseError[Response[F]](error)
           )
       }
       .orNotFound
@@ -86,7 +96,7 @@ object AuditServer extends IOApp {
     BlazeServerBuilder[IO]
       .withExecutionContext(global)
       .bindHttp(8080, "localhost")
-      .withHttpApp(helloWorldService[IO])
+      .withHttpApp(helloWorldService[IO](daoIO))
       .serve
       .compile
       .drain
