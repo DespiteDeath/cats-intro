@@ -1,8 +1,8 @@
 package misc
 
-import cats._
 import cats.effect._
 import cats.effect.testing.scalatest._
+import cats.implicits._
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -25,12 +25,4 @@ class MyConsoleSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
     } yield state shouldBe List("Enter your name", "Your name's test")
   }
 
-  it should "do the following" in {
-    def nice[F[_]: Concurrent] =
-      Concurrent[F].start(Applicative[F].pure(1))
-    for {
-      f <- nice[IO]
-      _ <- f.join
-    } yield assert(true)
-  }
 }
