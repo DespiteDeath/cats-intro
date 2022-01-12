@@ -3,102 +3,203 @@ package misc
 import cats._
 import cats.effect._
 import cats.effect.std._
-import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.testkit.TestControl
 import cats.implicits._
-import org.mockito.MockitoSugar
-import org.scalacheck.Test.Passed
-import org.scalacheck._
-import org.scalacheck.effect.PropF
-import org.scalacheck.effect.PropF.forAllF
-import org.scalatest.flatspec.AsyncFlatSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalacheck.Gen
+import weaver._
+import weaver.scalacheck._
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.util.control.NoStackTrace
 
-class CatsSpec extends AsyncFlatSpec with AsyncIOSpec with MockitoSugar with Matchers {
+object CatsSpec extends SimpleIOSuite with Checkers {
 
-  behavior of "cats"
+  test("print current thread") {
+    def printCurrentThread(): Unit     = println(Thread.currentThread().getName)
+    def printCurrentThreadIO: IO[Unit] = IO(printCurrentThread())
 
-  it should "run concurrently requires Concurrent" in {
+    def e1 = ExecutionContext.fromExecutor(runnable => new Thread(runnable, "th1").start())
+    def e2 = ExecutionContext.fromExecutor(runnable => new Thread(runnable, "th2").start())
+    def e3 = ExecutionContext.fromExecutor(runnable => new Thread(runnable, "th3").start())
+    def e4 = ExecutionContext.fromExecutor(runnable => new Thread(runnable, "th4").start())
+    def e5 = ExecutionContext.fromExecutor(runnable => new Thread(runnable, "th5").start())
+    def e6 = ExecutionContext.fromExecutor(runnable => new Thread(runnable, "th6").start())
+
+    for {
+      f1 <- (printCurrentThreadIO >>
+        printCurrentThreadIO.evalOn(e1) >>
+        printCurrentThreadIO.evalOn(e2).map(_ => printCurrentThread()).evalOn(e3).map(_ => printCurrentThread()))
+        .startOn(e6)
+      r1 <- f1.joinWithNever
+    } yield assert(r1 == ())
+  }
+
+  test("Implement timeout in terms of IO.racePair") {
+    case object Timeout extends RuntimeException with NoStackTrace
+    def timeout[A](io: IO[A], duration: FiniteDuration): IO[A] =
+      IO.racePair(IO.sleep(duration), io).flatMap {
+        case Left((_, fiberB)) =>
+          fiberB.cancel >> IO.raiseError[A](Timeout)
+        case Right((fiberA, Outcome.Succeeded(b))) =>
+          fiberA.cancel >> b
+      }
+    TestControl.execute(timeout[Int](IO.sleep(11 seconds) >> IO.pure(10), 10 seconds)) flatMap {
+      control =>
+        for {
+          _ <- control.tick
+          _ <- control.advance(10 seconds)
+          _ <- control.tick
+          r <- control.results
+        } yield assert(r.contains(Outcome.errored(Timeout)))
+    }
+  }
+
+  test("Implement timeout in terms of IO.race") {
+    case object Timeout extends RuntimeException with NoStackTrace
+    def timeout[A](io: IO[A], duration: FiniteDuration): IO[A] =
+      IO.race(IO.sleep(duration), io).flatMap {
+        case Left(()) => IO.raiseError[A](Timeout)
+        case Right(a) => IO.pure(a)
+      }
+    val p1: IO[Expectations] = TestControl
+      .execute(timeout[Int](IO.sleep(11 seconds) >> IO.pure(10), 10 seconds))
+      .flatMap { control =>
+        for {
+          _ <- control.tick
+          _ <- control.advance(10 seconds)
+          _ <- control.tick
+          r <- control.results
+        } yield assert(r.contains(Outcome.errored(Timeout)))
+      }
+
+    val p2: IO[Expectations] = TestControl
+      .execute(timeout[Int](IO.sleep(9 seconds) >> IO.pure(9), 10 seconds))
+      .flatMap { control =>
+        for {
+          _ <- control.tick
+          _ <- control.advance(9 seconds)
+          _ <- control.tick
+          r <- control.results
+        } yield assert(r.contains(Outcome.Succeeded(9)))
+      }
+
+    for {
+      e1 <- p1
+      e2 <- p2
+    } yield Expectations(e1.run |+| e2.run)
+  }
+
+  loggedTest("ref") { log =>
+    for {
+      state  <- IO.ref(0)
+      fibers <- state.update(_ + 1).start.replicateA(100)
+      _      <- fibers.traverse(_.join).void
+      value  <- state.get
+      _      <- log.debug(s"The final value is: $value")
+    } yield assert(value == 100)
+  }
+
+  test("run concurrently requires Concurrent") {
     def nice[F[_]: Concurrent]: F[Fiber[F, Throwable, Int]] =
       Concurrent[F].start(Applicative[F].pure(1))
     for {
       f <- nice[IO]
-      _ <- f.join
-    } yield assert(true)
+      r <- f.joinWithNever
+    } yield assert(r == 1)
   }
 
-  it should "run concurrently requires Spawn" in {
+  test("run concurrently requires Spawn") {
     def nice[F[_]: Spawn]: F[Fiber[F, Throwable, Int]] =
       Spawn[F].start(Applicative[F].pure(1))
     for {
       f <- nice[IO]
-      _ <- f.join
-    } yield assert(true)
+      r <- f.joinWithNever
+    } yield assert(r == 1)
   }
 
-  it should "run concurrently requires Temporal" in {
+  test("run concurrently requires Temporal") {
     def nice[F[_]: Temporal]: F[Fiber[F, Throwable, Int]] =
       Temporal[F].start(Applicative[F].pure(1))
     for {
       f <- nice[IO]
-      _ <- f.join
-    } yield assert(true)
+      r <- f.joinWithNever
+    } yield assert(r == 1)
   }
 
-  it should "give lock" in {
+  test("give lock") {
     def clock[F[_]: Clock]: F[FiniteDuration] = Clock[F].realTime
 
-    implicit object kk extends Clock[IO] {
-      override def applicative: Applicative[IO] = Applicative[IO]
-
-      override def monotonic: IO[FiniteDuration] = IO.pure(0 seconds)
-
-      override def realTime: IO[FiniteDuration] = IO.pure(0 seconds)
+    TestControl.execute(clock[IO]) flatMap { control =>
+      for {
+        _ <- control.advance(11.hours)
+        _ <- control.tick
+        r <- control.results
+      } yield assert(r.contains(Outcome.succeeded(11.hours)))
     }
-
-    clock[IO].map(d => assert(d == (0 seconds)))
   }
 
-  it should "gen integers" in {
-    val m: PropF[IO] = forAllF(Gen.alphaStr) { str =>
-      IO.println(str)
+  test("gen integers") {
+    forall(Gen.posNum[Int]) { a =>
+      IO(expect(a > 0))
     }
-    m.check().map(it => assert(it.status == Passed))
   }
 
-  it should "do the thing" in {
-    def retry[A](ioa: IO[A], delay: FiniteDuration, max: Int, random: Random[IO]): IO[A] =
-      if (max <= 1)
-        ioa
-      else
-        ioa handleErrorWith { _ =>
-          random.betweenLong(0L, delay.toNanos) flatMap { ns =>
-            IO.sleep(ns.nanos) *> retry(ioa, delay * 2, max - 1, random)
-          }
+  loggedTest("run on CI") { log =>
+    for {
+      _ <- log.info(sys.env.toString)
+      _ <- ignore("not on ci").unlessA(sys.env.contains("JENKINS"))
+      x <- IO.delay(1)
+      y <- IO.delay(2)
+    } yield expect(x == y)
+  }
+
+  loggedTest("do the thing") { log =>
+    TestControl.execute(IO.sleep(10.hours) >> IO.realTime) flatMap { control =>
+      for {
+        _ <- control.tick
+        _ <- control.advance(10.hours)
+        _ <- control.tick
+        r <- control.results
+      } yield assert(r.contains(Outcome.succeeded(10.hours)))
+    }
+  }
+
+  def retry[A](ioa: IO[A], delay: FiniteDuration, max: Int, random: Random[IO]): IO[A] =
+    if (max <= 1)
+      ioa
+    else
+      ioa handleErrorWith { _ =>
+        random.betweenLong(0L, delay.toNanos) flatMap { ns =>
+          IO.println(delay) >> IO.sleep(ns.nanos) *> retry(ioa, delay * 2, max - 1, random)
         }
+      }
 
+  test("backoff appropriately between attempts") {
     case object TestException extends RuntimeException
 
-    var attempts = 0
-    val action = IO {
-      attempts += 1
-
-      if (attempts != 3)
-        throw TestException
-      else
-        "success!"
-    }
-
-    val program: IO[String] = Random.scalaUtilRandom[IO] flatMap { random =>
+    val action = IO.raiseError[Int](TestException)
+    val program = Random.scalaUtilRandom[IO] flatMap { random =>
       retry(action, 1.minute, 5, random)
     }
 
-    TestControl.executeEmbed(program).map(it => assert(it == "success!"))
+    TestControl.execute(program).flatMap { control =>
+      for {
+        _ <- control.tick
+        _ <- (1 to 4).toList.traverse { i =>
+          for {
+            interval <- control.nextInterval
+            _        <- IO(assert(interval >= 0.nanos))
+            _        <- IO(assert(interval < (1 << i).minute))
+            _        <- control.advanceAndTick(interval)
+          } yield ()
+        }
+        r <- control.results
+      } yield assert(r.contains(Outcome.errored(TestException)))
+    }
   }
 
-  it should "make and use resources" in {
+  test("make and use resources") {
     def file(name: String): Resource[IO, String] =
       Resource.make(IO.pure(name))(str => IO.println(s"releasing $str"))
 
@@ -118,21 +219,21 @@ class CatsSpec extends AsyncFlatSpec with AsyncIOSpec with MockitoSugar with Mat
           bytes1 <- read(file1)
           bytes2 <- read(file2)
           _      <- write(file3, bytes1 ++ bytes2)
-        } yield ()
+        } yield assert(true)
     }
   }
 
-  it should "sort using pq" in {
+  test("sort using pq") {
     val list = List(1, 4, 3, 7, 5, 2, 6, 9, 8)
 
     for {
       pq <- PQueue.bounded[IO, Int](10)
       _  <- list.traverse(pq.offer)
       l  <- List.fill(list.length)(()).traverse(_ => pq.take)
-    } yield assertResult(List(1, 2, 3, 4, 5, 6, 7, 8, 9))(l)
+    } yield assert(List(1, 2, 3, 4, 5, 6, 7, 8, 9) == l)
   }
 
-  it should "covariant queue" in {
+  test("covariant queue") {
     def covariant(list: List[Int]): IO[List[Long]] =
       for {
         q <- Queue.bounded[IO, Int](10)
@@ -141,10 +242,10 @@ class CatsSpec extends AsyncFlatSpec with AsyncIOSpec with MockitoSugar with Mat
         l <- List.fill(list.length)(()).traverse(_ => qOfLongs.take)
       } yield l
 
-    covariant(List(1, 4, 2, 3)).flatMap(IO.println(_))
+    covariant(List(1, 4, 2, 3)).flatMap(IO.println(_)).map(_ => assert(true))
   }
 
-  it should "contravariant queue" in {
+  test("contravariant queue") {
     def contravariant(list: List[Boolean]): IO[List[Int]] =
       for {
         q <- Queue.bounded[IO, Int](10)
@@ -154,10 +255,10 @@ class CatsSpec extends AsyncFlatSpec with AsyncIOSpec with MockitoSugar with Mat
         l <- List.fill(list.length)(()).traverse(_ => q.take)
       } yield l
 
-    contravariant(List(true, false)).flatMap(IO.println(_))
+    contravariant(List(true, false)).flatMap(IO.println(_)).map(_ => assert(true))
   }
 
-  it should "contravariant box" in {
+  test("contravariant box") {
     trait Box[-T] {
       def m(t: T): Unit
     }
@@ -173,7 +274,7 @@ class CatsSpec extends AsyncFlatSpec with AsyncIOSpec with MockitoSugar with Mat
     IO(assert(true))
   }
 
-  it should "random1" in {
+  test("random1") {
     def dieRoll[F[_]: Functor: Random]: F[Int] =
       Random[F].betweenInt(0, 6).map(_ + 1) // `6` is excluded from the range
 
@@ -184,7 +285,7 @@ class CatsSpec extends AsyncFlatSpec with AsyncIOSpec with MockitoSugar with Mat
     } yield assert(List(1, 2, 3, 4, 5, 6).contains(i))
   }
 
-  it should "random2" in {
+  test("random2") {
     def dieRoll[F[_]: Functor: Random]: F[Int] =
       Random[F].betweenInt(0, 6).map(_ + 1) // `6` is excluded from the range
 
@@ -194,5 +295,12 @@ class CatsSpec extends AsyncFlatSpec with AsyncIOSpec with MockitoSugar with Mat
         dieRoll[IO]
       }
       .map(i => assert(List(1, 2, 3, 4, 5, 6).contains(i)))
+  }
+
+  loggedTest("logging") { log =>
+    val randomString: IO[String] = IO(scala.util.Random.alphanumeric.take(10).mkString)
+    randomString
+      .flatTap(str => log.debug(s"random string $str"))
+      .map(str => assert(str == str.reverse.reverse))
   }
 }

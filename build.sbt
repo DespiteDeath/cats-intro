@@ -9,6 +9,7 @@ ThisBuild / gitHeadCommitSha := Process("git rev-parse HEAD").lineStream.head
 
 Global / cancelable := true
 testFrameworks += new TestFramework("munit.Framework")
+testFrameworks += new TestFramework("weaver.framework.CatsEffect")
 
 lazy val root = (project in file(".")).settings(
   addCompilerPlugin("org.typelevel" % "kind-projector_2.13.6" % "0.13.2"),
@@ -70,7 +71,9 @@ lazy val root = (project in file(".")).settings(
       "io.circe"                   %% "circe-core"                    % "0.14.1" withSources,
       "io.circe"                   %% "circe-generic"                 % "0.14.1" withSources,
       "io.circe"                   %% "circe-parser"                  % "0.14.1" withSources,
-      "com.ringcentral"            %% "cassandra4io"                  % "0.1.10" withSources
+      "com.ringcentral"            %% "cassandra4io"                  % "0.1.10" withSources,
+      "com.disneystreaming"        %% "weaver-cats"                   % "0.7.9"    % Test withSources,
+      "com.disneystreaming"        %% "weaver-scalacheck"             % "0.7.9"    % Test withSources
     ),
   makeVersionProperties := {
     val propFile = (Compile / resourceManaged).value / "version.properties"
