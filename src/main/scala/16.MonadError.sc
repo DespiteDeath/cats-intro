@@ -1,10 +1,8 @@
+import cats._
+import cats.implicits._
+
 import scala.concurrent._
 import scala.util.{ Either, _ }
-import cats._
-import cats.data._
-import cats.implicits._
-import cats.effect._
-import cats.instances.all._
 
 implicit val cte = ExecutionContext.fromExecutor(_.run())
 
@@ -17,27 +15,28 @@ trait Store[F[_]] {
 }
 
 object MyOptionStore extends Store[Option] {
-  override def read(path: Path) = Some("config")
+  override def read(path: Path): Option[String] = Some("config")
 }
 
 object MyOptionStore1 extends Store[Option] {
-  override def read(path: Path) = None
+  override def read(path: Path): Option[String] = None
 }
 
 object MyTryStore extends Store[Try] {
-  override def read(path: Path) = Try("config")
+  override def read(path: Path): Try[String] = Try("config")
 }
 
+val fileNotFound = new RuntimeException("File not found")
 object MyTryStore1 extends Store[Try] {
-  override def read(path: Path) = Failure(new RuntimeException("File not found"))
+  override def read(path: Path): Try[String] = Failure(fileNotFound)
 }
 
 object MyFutureStore extends Store[Future] {
-  override def read(path: Path) = Future("config")
+  override def read(path: Path): Future[String] = Future("config")
 }
 
 object MyFutureStore1 extends Store[Future] {
-  override def read(path: Path) = Future.failed(new RuntimeException("File not found"))
+  override def read(path: Path): Future[String] = Future.failed(fileNotFound)
 }
 
 type MyEither[T] = Either[Throwable, T]
@@ -47,7 +46,7 @@ object MyEitherStore extends Store[MyEither] {
 }
 
 object MyEitherStore1 extends Store[MyEither] {
-  override def read(path: Path): MyEither[String] = Left(new RuntimeException("File not found"))
+  override def read(path: Path): MyEither[String] = Left(fileNotFound)
 }
 
 object ConfigurationStorage {

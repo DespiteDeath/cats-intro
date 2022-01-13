@@ -1,5 +1,7 @@
-import scala.concurrent._, scala.util._
-import cats._, cats.data._, cats.implicits._
+import cats._
+import cats.implicits._
+
+import scala.concurrent._
 
 implicit val cte = ExecutionContext.fromExecutor(_.run())
 

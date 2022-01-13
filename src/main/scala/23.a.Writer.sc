@@ -1,15 +1,14 @@
-import scala.concurrent._, scala.util._
-import cats._, cats.data._, cats.implicits._
+import cats.data._
+import cats.implicits._
+
+import scala.concurrent._
 implicit val cte = ExecutionContext.fromExecutor(_.run())
 
+def add(a: Int, b: Int): Writer[List[String], Int] =
+  Writer(List(s"+ $a and $b"), a + b)
 
-def add(a: Int, b: Int): Writer[List[String], Int] = {
-  Writer(List(s"+ $a and $b"), a+ b)
-}
-
-def multiply(a: Int, b: Int): Writer[List[String], Int] = {
+def multiply(a: Int, b: Int): Writer[List[String], Int] =
   Writer(List(s"* $a and $b"), a * b)
-}
 
 val result = for {
   x <- add(3, 4)

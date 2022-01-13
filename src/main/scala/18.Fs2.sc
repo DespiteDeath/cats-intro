@@ -1,6 +1,6 @@
-import fs2._
 import cats.effect._
 import cats.effect.unsafe.implicits.global
+import fs2._
 
 Stream(1, 2, 3)
 

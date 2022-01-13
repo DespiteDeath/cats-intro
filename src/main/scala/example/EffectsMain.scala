@@ -1,7 +1,12 @@
 package example
 
-import scala.concurrent._, duration._
-import cats._, implicits._, effect._, concurrent._, data._
+import cats._
+import cats.data._
+import cats.effect._
+import cats.implicits._
+
+import scala.concurrent._
+import scala.concurrent.duration._
 
 object EffectsMain extends IOApp {
 

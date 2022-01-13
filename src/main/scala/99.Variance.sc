@@ -16,10 +16,10 @@ val z: Z[String] = new Z[String]
 class Emp
 class Manager extends Emp
 class CEO extends Manager
-class Award[+T](val recipient: T) //co, +, extends, Generalize, up, get, source
-class Problem[-T](recipient: T) //contra, -, super,  Specialize, down, put, sink
+class Award[+T](val recipient: T)              //co, +, extends, Generalize, up, get, source
+class Problem[-T](recipient: T)                //contra, -, super,  Specialize, down, put, sink
 class Action1[+T <: Manager](val recipient: T) //Specialize < extends down
-class Action2[-T >: Manager](recipient: T) //Generalize > super up
+class Action2[-T >: Manager](recipient: T)     //Generalize > super up
 
 // Function[-A, +B]
 val f1: Function[Manager, Manager] = _ => new CEO

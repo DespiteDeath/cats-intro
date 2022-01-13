@@ -15,6 +15,7 @@ object main1 extends IOApp.Simple {
   case class TimedError(duration: FiniteDuration, a: Throwable)
       extends Exception(duration.toString(), a)
       with NoStackTrace
+
   def myTimed1[A, F[_]](
       k: F[A]
   )(implicit me: MonadError[F, Throwable], temporal: Temporal[F]): F[(FiniteDuration, A)] =

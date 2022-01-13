@@ -1,11 +1,8 @@
-import scala.concurrent._
-import scala.util._
-import cats._
 import cats.data.Validated.Invalid
 import cats.data._
 import cats.implicits._
 
-import scala.util.chaining._
+import scala.concurrent._
 import scala.util.control.NoStackTrace
 implicit val cte = ExecutionContext.fromExecutor(_.run())
 

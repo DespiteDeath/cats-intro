@@ -1,5 +1,5 @@
-import scala.concurrent._, scala.util._
-import cats._, cats.data._, cats.implicits._, cats.effect._, cats.free._
+import cats.effect._
+import cats.implicits._
 
 //https://typelevel.org/cats/faq.html
 

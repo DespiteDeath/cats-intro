@@ -1,5 +1,6 @@
-import scala.concurrent._, scala.util._
-import cats._, cats.data._, cats.implicits._, cats.effect._, cats.free._
+import cats._
+import cats.data._
+import cats.free._
 
 sealed abstract class KVStoreA[A] extends Product with Serializable
 
@@ -11,7 +12,7 @@ final case class Delete[T](key: String) extends KVStoreA[Option[T]]
 
 type KVStore[A] = Free[KVStoreA, A]
 
-import Free._
+import cats.free.Free._
 
 def put[T](key: String, value: T): KVStore[Unit] = liftF[KVStoreA, Unit](Put[T](key, value))
 def get[T](key: String): KVStore[Option[T]] = liftF[KVStoreA, Option[T]](Get[T](key))

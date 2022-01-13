@@ -6,7 +6,7 @@ object OddEven {
   def even(n: Int): Eval[String] =
     Eval.now(n <= 0).flatMap {
       case true => Eval.now("done")
-      case _ => odd(n - 1)
+      case _    => odd(n - 1)
     }
 }
 

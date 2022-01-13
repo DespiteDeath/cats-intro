@@ -1,7 +1,10 @@
-import scala.concurrent._, scala.util._
-import cats.data._, cats.implicits._
+import cats.data._
+import cats.implicits._
 
-implicit val cte = ExecutionContext.fromExecutor(_.run())
+import scala.concurrent._
+import scala.util._
+
+implicit val cte: ExecutionContextExecutor = ExecutionContext.fromExecutor(_.run())
 
 type FEI = Future[String Either Int]
 
