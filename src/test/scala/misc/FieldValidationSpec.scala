@@ -3,10 +3,10 @@ package misc
 import cats.data.Validated.Invalid
 import cats.data._
 import cats.implicits._
-import io.circe.{ Decoder, Encoder }
 import io.circe.generic.semiauto._
 import io.circe.parser._
 import io.circe.syntax._
+import io.circe.{ Decoder, Encoder }
 import org.scalacheck.Gen
 import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
@@ -26,15 +26,19 @@ class FieldValidationSpec
 
   implicit override val generatorDrivenConfig = PropertyCheckConfiguration()
 
-  val emailTooShort = for {
+  val emailTooShort: Gen[String] = for {
     numberOfElems <- Gen.choose(0, 9)
     chars         <- Gen.listOfN(numberOfElems, Gen.asciiPrintableChar)
   } yield chars.mkString
 
-  val emailTooLong = for {
+  val passwordTooShort: Gen[String] = emailTooShort
+
+  val emailTooLong: Gen[String] = for {
     numberOfElems <- Gen.choose(21, 100)
     chars         <- Gen.listOfN(numberOfElems, Gen.asciiPrintableChar)
   } yield chars.mkString
+
+  val passwordTooLong = emailTooLong
 
   it should "validate short email" in {
     import FieldValidation._
@@ -55,7 +59,7 @@ class FieldValidationSpec
       Validated.invalidNel[FieldValidationError, (String, String)](PasswordError.TooShort)
     val errors = emailTooShortError productL passwordTooShortError
 
-    forAll(emailTooShort, emailTooShort) { (emailTooShort, passwordTooShort) =>
+    forAll(emailTooShort, passwordTooShort) { (emailTooShort, passwordTooShort) =>
       assertResult(errors)(
         validateEmailPassword(emailTooShort, passwordTooShort)
       )

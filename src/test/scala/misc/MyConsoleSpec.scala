@@ -3,6 +3,7 @@ package misc
 import cats.effect._
 import cats.effect.testing.scalatest._
 import cats.implicits._
+import misc.MyConsole.ref.ConsoleRef
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -18,10 +19,10 @@ class MyConsoleSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
 
   it should "read user name 2 " in {
     for {
-      ref <- Ref.of[IO, List[String]](List.empty)
-      implicit0(c: MyConsole[IO]) = new MyConsole.ref.ConsoleRef[IO](ref)
+      console <- ConsoleRef.make[IO]
+      implicit0(c: MyConsole[IO]) = console
       _     <- MyConsole.readUserName[IO]()
-      state <- ref.get
+      state <- console.ref.get
     } yield state shouldBe List("Enter your name", "Your name's test")
   }
 

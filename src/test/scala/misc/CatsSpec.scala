@@ -9,34 +9,210 @@ import org.scalacheck.Gen
 import weaver._
 import weaver.scalacheck._
 
-import scala.concurrent.ExecutionContext
+import java.util.concurrent.{ CompletableFuture, TimeUnit }
 import scala.concurrent.duration._
-import scala.util.control.NoStackTrace
 
+/**
+  * https://typelevel.org/blog/2020/10/30/concurrency-in-ce3.html
+  * https://blog.rockthejvm.com/cats-effect-racing-fibers/
+  */
 object CatsSpec extends SimpleIOSuite with Checkers {
 
+  test("defer") {
+    for {
+      start <- IO.deferred[Boolean]
+      done  <- IO.deferred[Boolean]
+      r <- (IO.println("1.ready") *>
+        start.get *>
+        IO.println("2.doing it") *>
+        IO.sleep(2.seconds) *>
+        IO.println("3.done") *> done.complete(true)).background.use { outcome =>
+        IO.sleep(2.seconds) *> IO.println("1.carry on ") *> start.complete(true) *> done.get *> IO
+          .println("4.ok")
+      }
+    } yield Passed
+  }
+
+  test("defer not completing") {
+    for {
+      gate <- IO.deferred[Boolean]
+      r <-
+        gate.get
+          .timeout(1.second)
+          .handleErrorWith(_ => IO.println("failed to get it") *> false.pure[IO])
+    } yield assert(!r)
+  }
+
+  test("ref updates should be idempotent, i.e. not effectful".only) {
+    for {
+      ref <- Ref[IO].of(0)
+      _ <- Supervisor[IO].use { supervisor =>
+        supervisor.supervise(ref.update(_ + 1)).replicateA(100)
+      }
+      k <- ref.get
+    } yield assert(k == 100)
+  }
+
+  test("parProduct") {
+    IO.sleep(1.second).parProduct(IO.sleep(1.second)).void.map(_Passed)
+  }
+
+  test("1. LEAK: background") {
+    val child = (IO.sleep(1.second) *> IO.println("done")).onCancel(IO.println("cancelled"))
+    child.start.flatMap(_.join).timeout(100.millis).map(_Passed) //1 LEAK, see done, not cancelled
+  }
+  test("2. OK: background to avoid fiber leaks") {
+    val child = (IO.sleep(1.second) *> IO.println("done")).onCancel(IO.println("cancelled"))
+    child.background.use(_.map(_ => ())).timeout(100.millis).map(_Passed) //2 no done, see cancelled
+  }
+  test("3. OK: supervisor to avoid fiber leaks") {
+    val child = (IO.sleep(1.second) *> IO.println("done")).onCancel(IO.println("cancelled"))
+    Supervisor[IO]
+      .use { supervisor =>
+        supervisor.supervise(child).flatMap(_.join).timeout(100.millis)
+      }
+      .map(_Passed) //3 no done, see cancelled
+  }
+
+  test("background") {
+    //The Fiber itself is a resource. If you do something like fa.start.void, then fa will just keep running forever and no one can stop it
+    //So the runloop itself leaks
+    val t1 = IO(1).start.void.start.flatMap(_.cancel) //leaks
+
+    //basically, start exists as a primitive to support more complicated things
+    val t2 = IO(1).background.use(_ => IO.unit).start.flatMap(_.cancel) //it's not a leak anymore
+
+    val m2 = (IO.println("hello") *> IO.sleep(1.second))
+      .flatMap(_ => IO.println("flatMap"))
+      .guarantee(IO.println("guarantee"))
+      .onCancel(IO.println("onCancel"))
+      .foreverM
+      .background
+      .surround {
+        IO.sleep(5.seconds)
+      }
+    m2.map(_Passed)
+  }
+
+  test("ops >>(lazily evaluated) *>(strictly evaluated)") {
+    val p1 = for {
+      f <- (IO.sleep(3.seconds) >> IO.pure(1)).start
+      _ <- f.cancel
+      d <- f.join
+    } yield assert(d == Outcome.canceled)
+
+    val p2 = for {
+      f <- IO.sleep(3.seconds).start
+      _ <- f.cancel
+      r <- f.joinWith(IO.println("cancelled"))
+    } yield Passed
+
+    val p3 = for {
+      f <- IO.sleep(3.seconds).start
+      _ <- f.cancel
+      r <- f.join !> IO.pure(1)
+    } yield assert(r == 1)
+
+    p1 |+| p2 |+| p3
+  }
+
+  test("uncancelable and poll???") {
+    //poll like a "cancelable" block
+    val p1 = for {
+      start <- IO.monotonic
+      f <- IO.uncancelable { _ =>
+        IO.sleep(3.seconds)
+      }.start
+      _   <- f.cancel
+      end <- IO.monotonic
+      duration: FiniteDuration = end - start
+    } yield assert(duration.toNanos >= 3.seconds.toNanos)
+
+    val p2 = for {
+      start <- IO.monotonic
+      f <- IO.uncancelable { poll =>
+        poll(IO.sleep(100.seconds)).onCancel(IO.println("cancelled"))
+      }.start
+      _   <- f.cancel
+      end <- IO.monotonic
+    } yield assert(end - start <= 1.seconds)
+    p1 |+| p2
+  }
+
+  test("async") {
+    def myAsync[F[_]: Async]: F[Int] =
+      Async[F].async { callback =>
+        callback(1.asRight[Throwable])
+        Applicative[F].pure(None) //cleanup function
+      }
+    myAsync[IO].map(i => assert(i == 1))
+  }
+
+  test("async cancelled") {
+    def myAsync[F[_]: Async: Console]: F[Int] =
+      Async[F].async { callback =>
+        CompletableFuture.supplyAsync { () =>
+          TimeUnit.SECONDS.sleep(10)
+          callback(1.asRight[Throwable])
+        }
+        Console[F].println("cancelled").some.pure[F] //cleanup function
+      }
+
+    for {
+      f <- myAsync[IO].start
+      _ <- f.cancel
+    } yield Passed
+  }
+
   test("print current thread") {
-    def printCurrentThread(): Unit     = println(Thread.currentThread().getName)
-    def printCurrentThreadIO: IO[Unit] = IO(printCurrentThread())
-
-    def e1 = ExecutionContext.fromExecutor(runnable => new Thread(runnable, "th1").start())
-    def e2 = ExecutionContext.fromExecutor(runnable => new Thread(runnable, "th2").start())
-    def e3 = ExecutionContext.fromExecutor(runnable => new Thread(runnable, "th3").start())
-    def e4 = ExecutionContext.fromExecutor(runnable => new Thread(runnable, "th4").start())
-    def e5 = ExecutionContext.fromExecutor(runnable => new Thread(runnable, "th5").start())
-    def e6 = ExecutionContext.fromExecutor(runnable => new Thread(runnable, "th6").start())
-
     for {
       f1 <- (printCurrentThreadIO >>
         printCurrentThreadIO.evalOn(e1) >>
-        printCurrentThreadIO.evalOn(e2).map(_ => printCurrentThread()).evalOn(e3).map(_ => printCurrentThread()))
+        printCurrentThreadIO
+          .evalOn(e2)
+          .map(_ => printCurrentThread())
+          .evalOn(e3)
+          .map(_ => printCurrentThread()))
         .startOn(e6)
       r1 <- f1.joinWithNever
-    } yield assert(r1 == ())
+    } yield Passed
+  }
+
+  test("Implement parTraverse in terms of IO.both") {
+    val m: IO[List[Int]] = List(1, 2, 3).traverse(IO.pure)
+    val k: IO[List[Int]] = List(1, 2, 3).parTraverse(IO.pure)
+
+    def myTraverse[A, B](as: List[A])(f: A => IO[B]): IO[List[B]] =
+      as.foldLeft(IO.pure(List.empty[B])) {
+        case (r, e) =>
+          for {
+            l <- r
+            b <- f(e)
+          } yield l :+ b
+      }
+
+    def parTraverse[A, B](as: List[A])(f: A => IO[B]): IO[List[B]] =
+      as.grouped(2).foldLeft(IO.pure(List.empty[B])) {
+        case (bl, List(a)) =>
+          for {
+            bl <- bl
+            b  <- f(a)
+          } yield bl :+ b
+        case (bl, List(a1, a2)) =>
+          for {
+            bl <- bl
+            (b1, b2) <-
+              IO.both(f(a1).flatTap(_printCurrentThreadIO), f(a2).flatTap(_printCurrentThreadIO))
+          } yield bl :+ b1 :+ b2
+      }
+
+    parTraverse(List(1, 2, 3))(IO.pure).map(list => assert(list == List(1, 2, 3)))
+    parTraverse(List(1, 2, 3, 4, 5, 6, 7))(IO.pure).map(list =>
+      assert(list == List(1, 2, 3, 4, 5, 6, 7))
+    )
   }
 
   test("Implement timeout in terms of IO.racePair") {
-    case object Timeout extends RuntimeException with NoStackTrace
     def timeout[A](io: IO[A], duration: FiniteDuration): IO[A] =
       IO.racePair(IO.sleep(duration), io).flatMap {
         case Left((_, fiberB)) =>
@@ -48,15 +224,13 @@ object CatsSpec extends SimpleIOSuite with Checkers {
       control =>
         for {
           _ <- control.tick
-          _ <- control.advance(10 seconds)
-          _ <- control.tick
+          _ <- control.advanceAndTick(10 seconds)
           r <- control.results
         } yield assert(r.contains(Outcome.errored(Timeout)))
     }
   }
 
   test("Implement timeout in terms of IO.race") {
-    case object Timeout extends RuntimeException with NoStackTrace
     def timeout[A](io: IO[A], duration: FiniteDuration): IO[A] =
       IO.race(IO.sleep(duration), io).flatMap {
         case Left(()) => IO.raiseError[A](Timeout)
@@ -67,8 +241,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
       .flatMap { control =>
         for {
           _ <- control.tick
-          _ <- control.advance(10 seconds)
-          _ <- control.tick
+          _ <- control.advanceAndTick(10 seconds)
           r <- control.results
         } yield assert(r.contains(Outcome.errored(Timeout)))
       }
@@ -78,26 +251,35 @@ object CatsSpec extends SimpleIOSuite with Checkers {
       .flatMap { control =>
         for {
           _ <- control.tick
-          _ <- control.advance(9 seconds)
-          _ <- control.tick
+          _ <- control.advanceAndTick(9 seconds)
           r <- control.results
         } yield assert(r.contains(Outcome.Succeeded(9)))
       }
 
-    for {
-      e1 <- p1
-      e2 <- p2
-    } yield Expectations(e1.run |+| e2.run)
+    p1 |+| p2
   }
 
   loggedTest("ref") { log =>
     for {
       state  <- IO.ref(0)
-      fibers <- state.update(_ + 1).start.replicateA(100)
+      fibers <- (state.update(_ + 1) >> printCurrentThreadIO).start.replicateA(100)
       _      <- fibers.traverse(_.join).void
       value  <- state.get
       _      <- log.debug(s"The final value is: $value")
     } yield assert(value == 100)
+  }
+
+  test("ref2") {
+    Counter.make[IO].flatMap { c =>
+      for {
+        _ <- c.get.flatMap(IO.println)
+        _ <- c.incr
+        _ <- c.get.flatMap(IO.println)
+        _ <- c.incr.replicateA(5).void
+        _ <- c.get.flatMap(IO.println)
+        k <- c.get
+      } yield assert(k == 6)
+    }
   }
 
   test("run concurrently requires Concurrent") {
@@ -154,12 +336,11 @@ object CatsSpec extends SimpleIOSuite with Checkers {
     } yield expect(x == y)
   }
 
-  loggedTest("do the thing") { log =>
+  test("do the thing") {
     TestControl.execute(IO.sleep(10.hours) >> IO.realTime) flatMap { control =>
       for {
         _ <- control.tick
-        _ <- control.advance(10.hours)
-        _ <- control.tick
+        _ <- control.advanceAndTick(10.hours)
         r <- control.results
       } yield assert(r.contains(Outcome.succeeded(10.hours)))
     }
@@ -219,7 +400,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
           bytes1 <- read(file1)
           bytes2 <- read(file2)
           _      <- write(file3, bytes1 ++ bytes2)
-        } yield assert(true)
+        } yield Passed
     }
   }
 
@@ -242,7 +423,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
         l <- List.fill(list.length)(()).traverse(_ => qOfLongs.take)
       } yield l
 
-    covariant(List(1, 4, 2, 3)).flatMap(IO.println(_)).map(_ => assert(true))
+    covariant(List(1, 4, 2, 3)).flatMap(IO.println(_)).map(_Passed)
   }
 
   test("contravariant queue") {
@@ -255,7 +436,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
         l <- List.fill(list.length)(()).traverse(_ => q.take)
       } yield l
 
-    contravariant(List(true, false)).flatMap(IO.println(_)).map(_ => assert(true))
+    contravariant(List(true, false)).flatMap(IO.println(_)).map(_Passed)
   }
 
   test("contravariant box") {
@@ -271,7 +452,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
     val boxBoolean: Box[Boolean] =
       Contravariant[Box].contramap(BoxInt)((b: Boolean) => if (b) 1 else 0)
     boxBoolean.m(false)
-    IO(assert(true))
+    IO(Passed)
   }
 
   test("random1") {
@@ -303,4 +484,5 @@ object CatsSpec extends SimpleIOSuite with Checkers {
       .flatTap(str => log.debug(s"random string $str"))
       .map(str => assert(str == str.reverse.reverse))
   }
+
 }

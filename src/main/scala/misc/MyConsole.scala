@@ -28,17 +28,20 @@ object MyConsole {
   object ref {
     type MyRef[F[_]] = Ref[F, List[String]]
 
-    class ConsoleRef[F[_]: Applicative](ref: MyRef[F]) extends MyConsole[F] {
+    class ConsoleRef[F[_]: Applicative](val ref: MyRef[F]) extends MyConsole[F] {
       override def printLn(string: String): F[Unit] = ref.update(_ :+ string)
-
       override def readLn(): F[String] = Applicative[F].pure("test")
+    }
+
+    object ConsoleRef {
+      def make[F[_]: Applicative: Ref.Make]: F[ConsoleRef[F]] =
+        Ref.of[F, List[String]](List.empty).map(ref => new ConsoleRef(ref))
     }
   }
 
   object sync {
     class ConsoleSync[F[_]: Sync] extends MyConsole[F] {
       override def printLn(string: String): F[Unit] = Sync[F].delay(println(string))
-
       override def readLn(): F[String] = Sync[F].delay(scala.io.StdIn.readLine())
     }
   }

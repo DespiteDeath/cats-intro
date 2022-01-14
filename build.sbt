@@ -48,11 +48,12 @@ lazy val root = (project in file(".")).settings(
       "org.typelevel"              %% "cats-testkit-scalatest"        % "2.1.5"    % Test withSources,
       "org.typelevel"              %% "cats-effect"                   % "3.3.1" withSources,
       "org.typelevel"              %% "cats-effect-std"               % "3.3.1" withSources,
-      "org.typelevel"              %% "cats-effect-kernel"            % "3.3.1" withSources,
+      "org.typelevel"              %% "cats-effect-kernel"            % "3.3.4" withSources,
       "org.typelevel"              %% "cats-effect-testkit"           % "3.3.1"    % Test withSources,
       "org.typelevel"              %% "cats-effect-testing-scalatest" % "1.4.0"    % Test withSources,
-      "co.fs2"                     %% "fs2-core"                      % "3.2.3" withSources,
-      "co.fs2"                     %% "fs2-io"                        % "3.2.3" withSources,
+      "co.fs2"                     %% "fs2-core"                      % "3.2.4" withSources,
+      "co.fs2"                     %% "fs2-io"                        % "3.2.4" withSources,
+      "co.fs2"                     %% "fs2-scodec"                    % "3.2.4" withSources,
       "org.typelevel"              %% "cats-tagless-macros"           % "0.14.0" withSources,
       "org.typelevel"              %% "simulacrum"                    % "1.0.1" withSources,
       "org.scalatest"              %% "scalatest"                     % "3.2.10"   % Test withSources,
@@ -73,7 +74,8 @@ lazy val root = (project in file(".")).settings(
       "io.circe"                   %% "circe-parser"                  % "0.14.1" withSources,
       "com.ringcentral"            %% "cassandra4io"                  % "0.1.10" withSources,
       "com.disneystreaming"        %% "weaver-cats"                   % "0.7.9"    % Test withSources,
-      "com.disneystreaming"        %% "weaver-scalacheck"             % "0.7.9"    % Test withSources
+      "com.disneystreaming"        %% "weaver-scalacheck"             % "0.7.9"    % Test withSources,
+      "tf.tofu"                    %% "tofu-core-ce3"                 % "0.10.6" withSources
     ),
   makeVersionProperties := {
     val propFile = (Compile / resourceManaged).value / "version.properties"
