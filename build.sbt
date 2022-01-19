@@ -1,3 +1,5 @@
+import sbt.Keys.scalacOptions
+
 import scala.language.postfixOps
 import scala.sys.process.Process
 
@@ -8,45 +10,48 @@ val makeVersionProperties =
 ThisBuild / gitHeadCommitSha := Process("git rev-parse HEAD").lineStream.head
 
 Global / cancelable := true
-testFrameworks += new TestFramework("munit.Framework")
-testFrameworks += new TestFramework("weaver.framework.CatsEffect")
+
+val defaultScalaOptions = Seq(
+  //A -X option suggests permanence, while a -Y could disappear at any time
+  "-encoding",
+  "UTF-8",                         // source files are in UTF-8
+  "-explaintypes",                 // Explain type errors in more detail.
+  "-deprecation",                  // warn about use of deprecated APIs
+  "-unchecked",                    // warn about unchecked type parameters
+  "-feature",                      // warn about misused language features
+  "-language:postfixOps",          // allow higher kinded types without `import scala.language.postfixOps`
+  "-language:higherKinds",         // allow higher kinded types without `import scala.language.higherKinds`
+  "-language:implicitConversions", // Allow definition of implicit functions called views
+  "-language:existentials",        // Existential types (besides wildcard types) can be written and inferred
+  "-language:reflectiveCalls",
+  //"-Xlint", // enable handy linter warnings
+  //"-Xfatal-warnings", // turn compiler warnings into errors
+  "-Yrangepos",
+  "-Ymacro-annotations"
+)
+
+val kindProjector    = addCompilerPlugin("org.typelevel" % "kind-projector_2.13.6" % "0.13.2")
+val betterMonadicFor = addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
+val compilerPlugins  = Seq(kindProjector, betterMonadicFor)
+
+val defaultSettings = Seq(
+    version := "0.1",
+    scalaVersion := "2.13.6",
+    organization := "org.inanme",
+    semanticdbEnabled := true,
+    semanticdbVersion := "4.4.18",
+    testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
+    scalacOptions ++= defaultScalaOptions
+  ) ++ compilerPlugins
 
 lazy val root = (project in file(".")).settings(
-  addCompilerPlugin("org.typelevel" % "kind-projector_2.13.6" % "0.13.2"),
-  addCompilerPlugin("com.olegpy"   %% "better-monadic-for"    % "0.3.1"),
-  inThisBuild(
-    Seq(
-      version := "0.1",
-      scalaVersion := "2.13.6",
-      organization := "org.inanme",
-      semanticdbEnabled := true,
-      semanticdbVersion := "4.4.18"
-    )
-  ),
+  defaultSettings,
   name := "cats-intro",
-  scalacOptions ++= Seq(
-      //A -X option suggests permanence, while a -Y could disappear at any time
-      "-encoding",
-      "UTF-8",                         // source files are in UTF-8
-      "-explaintypes",                 // Explain type errors in more detail.
-      "-deprecation",                  // warn about use of deprecated APIs
-      "-unchecked",                    // warn about unchecked type parameters
-      "-feature",                      // warn about misused language features
-      "-language:postfixOps",          // allow higher kinded types without `import scala.language.postfixOps`
-      "-language:higherKinds",         // allow higher kinded types without `import scala.language.higherKinds`
-      "-language:implicitConversions", // Allow definition of implicit functions called views
-      "-language:existentials",        // Existential types (besides wildcard types) can be written and inferred
-      "-language:reflectiveCalls",
-      //"-Xlint", // enable handy linter warnings
-      //"-Xfatal-warnings", // turn compiler warnings into errors
-      "-Yrangepos",
-      "-Ymacro-annotations"
-    ),
   libraryDependencies ++= Seq(
       "org.typelevel"              %% "cats-core"                     % "2.7.0" withSources,
       "org.typelevel"              %% "cats-free"                     % "2.7.0" withSources,
       "org.typelevel"              %% "cats-testkit-scalatest"        % "2.1.5"    % Test withSources,
-      "org.typelevel"              %% "cats-effect"                   % "3.3.1" withSources,
+      "org.typelevel"              %% "cats-effect"                   % "3.3.4" withSources,
       "org.typelevel"              %% "cats-effect-std"               % "3.3.1" withSources,
       "org.typelevel"              %% "cats-effect-kernel"            % "3.3.4" withSources,
       "org.typelevel"              %% "cats-effect-testkit"           % "3.3.1"    % Test withSources,
@@ -74,8 +79,7 @@ lazy val root = (project in file(".")).settings(
       "io.circe"                   %% "circe-parser"                  % "0.14.1" withSources,
       "com.ringcentral"            %% "cassandra4io"                  % "0.1.10" withSources,
       "com.disneystreaming"        %% "weaver-cats"                   % "0.7.9"    % Test withSources,
-      "com.disneystreaming"        %% "weaver-scalacheck"             % "0.7.9"    % Test withSources,
-      "tf.tofu"                    %% "tofu-core-ce3"                 % "0.10.6" withSources
+      "com.disneystreaming"        %% "weaver-scalacheck"             % "0.7.9"    % Test withSources
     ),
   makeVersionProperties := {
     val propFile = (Compile / resourceManaged).value / "version.properties"
@@ -84,4 +88,25 @@ lazy val root = (project in file(".")).settings(
     Seq(propFile)
   },
   Compile / resourceGenerators += makeVersionProperties
+)
+
+lazy val `tofu-ce2` = (project in file("tofu-ce2")).settings(
+  defaultSettings,
+  libraryDependencies ++= Seq(
+      "org.typelevel"       %% "cats-effect"             % "2.5.4" withSources,
+      "com.disneystreaming" %% "weaver-cats"             % "0.6.7" % Test withSources,
+      "tf.tofu"             %% "tofu-core-ce2"           % "0.10.6" withSources,
+      "tf.tofu"             %% "tofu-concurrent"         % "0.10.6" withSources,
+      "tf.tofu"             %% "tofu-kernel-ce2-interop" % "0.10.6" withSources
+    )
+)
+
+lazy val `tofu-ce3` = (project in file("tofu-ce3")).settings(
+  defaultSettings,
+  libraryDependencies ++= Seq(
+      "org.typelevel"       %% "cats-effect"             % "3.3.4" withSources,
+      "com.disneystreaming" %% "weaver-cats"             % "0.7.9" % Test withSources,
+      "tf.tofu"             %% "tofu-core-ce3"           % "0.10.6" withSources,
+      "tf.tofu"             %% "tofu-kernel-ce3-interop" % "0.10.6" withSources
+    )
 )
