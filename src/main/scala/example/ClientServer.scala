@@ -18,10 +18,8 @@ object ClientServer extends IOApp.Simple {
         _ <- line match {
           case "" => Sync[F].unit // Empty line, we are done
           case _ =>
-            Sync[F].delay { writer.write(line); writer.newLine(); writer.flush() } >> loop(
-              reader,
-              writer
-            )
+            Sync[F].delay { writer.write(line); writer.newLine(); writer.flush() } >>
+            loop(reader, writer)
         }
       } yield ()
 

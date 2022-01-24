@@ -1,42 +1,13 @@
 package example
 
-import cats._
+import cats.MonadError
 import cats.data._
 import cats.effect._
+import cats.effect.implicits._
+import cats.effect.std.{ Console, Random }
 import cats.implicits._
 
-import scala.concurrent._
 import scala.concurrent.duration._
-
-object EffectsMain extends IOApp {
-
-  val compute: IO[Long] = {
-    def makeIO(r: Long): IO[Long] = IO.sleep(r seconds).flatMap(_ => IO.pure(r))
-
-    val two   = makeIO(2)
-    val three = makeIO(3)
-
-    (two, three).parMapN {
-      case (m, n) => m + n
-    }
-
-  }
-
-  override def run(args: List[String]): IO[ExitCode] =
-    now
-      .bracket(_ => compute)(start =>
-        now.map(_ - start).flatMap(duration => putStrLine[IO](duration.toString))
-      )
-      .handleErrorWith(e => IO(e.printStackTrace()))
-      .as(ExitCode.Success)
-}
-
-object ParMapN extends IOApp {
-  val ioA = IO.sleep(10.seconds) *> IO(println("Delayed!"))
-  val ioB = IO.raiseError[Unit](new Exception("dummy"))
-  override def run(args: List[String]): IO[ExitCode] =
-    (ioA, ioB).parMapN((_, _) => ()).as(ExitCode.Success)
-}
 
 object ParTraverse extends IOApp {
   override def run(args: List[String]): IO[ExitCode] =
@@ -48,46 +19,51 @@ object ParTraverse extends IOApp {
 
 object ParFailFast extends IOApp {
 
-  def handleError(s: String, th: Throwable): IO[String] = {
-    th.printStackTrace()
-    IO.pure(s"$s failed")
+  def make[F[_]: Sync: Console: Random: LiftIO](s: String, d: FiniteDuration): F[String] = {
+    val t = for {
+      _    <- printCurrentThread[F](s"start io$s ${d.toSeconds}")
+      bool <- Random[F].nextBoolean
+      _    <- MonadError[F, Throwable].raiseWhen(bool)(new IllegalArgumentException(s"$s failed"))
+      _    <- IO.sleep(d).to[F]
+      _    <- Console[F].println(s"done io$s")
+    } yield s
+
+    t.onCancel(Console[F].println(s"$s cancelled"))
   }
-
-  def makeIO(s: String, d: FiniteDuration): IO[String] =
-    putStrLine[IO](s"start io$s") *>
-    IO {
-      if (scala.util.Random.nextBoolean()) throw new IllegalArgumentException(s"$s failed")
-      s
-    } <* IO.sleep(d) <* putStrLine[IO](s"done io$s")
-
-  val a: IO[String] = makeIO("a", 1 second)
-
-  val b: IO[String] = makeIO("b", 5 second)
-
-  val c: IO[String] = makeIO("c", 3 second)
-
-  def run1(args: List[String]): IO[ExitCode] =
-    Parallel
-      .parMap3(a, b, c) {
-        case (m, n, o) => s"$m - $n - $o"
-      }
-      .map(println)
-      .as(ExitCode.Success)
-
-  val handler: PartialFunction[Throwable, IO[String]] = {
-    case e => putStrLine[IO](s"parFailFast-handler: $e") *> IO.raiseError(e)
-  }
-
-  val logic: IO[Either[Throwable, List[Either[Throwable, String]]]] = List(a, b, c).parTraverse {
-    fa =>
-      Deferred[IO, Either[Throwable, String]].flatMap { d =>
-        Concurrent[IO].start(fa.recoverWith(handler).attempt.flatMap(d.complete)) *> d.get
-      }
-  }.attempt
 
   def run(args: List[String]): IO[ExitCode] =
-    now
-      .bracket(_ => logic)(start => now.map(_ - start).map(println))
+    Random
+      .scalaUtilRandom[IO]
+      .flatMap { implicit random =>
+        (make[IO]("a", 11 second), make[IO]("b", 5 second), make[IO]("c", 3 second))
+          .parMapN {
+            case (m, n, o) => s"$m - $n - $o"
+          }
+          .map(println)
+      }
       .as(ExitCode.Success)
+
+  def makeIO1(s: String, d: FiniteDuration): IO[String] =
+    (printCurrentThread[IO](s"start io$s ${d.toSeconds}") *>
+    IO(s) <* IO.sleep(d) <* putStrLine[IO](s"done io$s")).onCancel(IO.println(s"$s cancelled"))
+
+  def run1(args: List[String]): IO[ExitCode] =
+    (IO.race(makeIO1("a", 11 second), makeIO1("b", 5 second)) >>= IO.println).as(ExitCode.Success)
+
+  //  val handler: PartialFunction[Throwable, IO[String]] = {
+//    case e => putStrLine[IO](s"parFailFast-handler: $e") *> IO.raiseError(e)
+//  }
+//
+//  val logic: IO[Either[Throwable, List[Either[Throwable, String]]]] = List(a, b, c).parTraverse {
+//    fa =>
+//      Deferred[IO, Either[Throwable, String]].flatMap { d =>
+//        Concurrent[IO].start(fa.recoverWith(handler).attempt.flatMap(d.complete)) *> d.get
+//      }
+//  }.attempt
+//
+//  def run(args: List[String]): IO[ExitCode] =
+//    now
+//      .bracket(_ => logic)(start => now.map(_ - start).map(println))
+//      .as(ExitCode.Success)
 
 }

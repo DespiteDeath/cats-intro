@@ -18,11 +18,44 @@ import scala.concurrent.duration._
   */
 object CatsSpec extends SimpleIOSuite with Checkers {
 
+  test("conditionals") {
+    val isWeekday = true
+    for {
+      _ <- IO.println("Working").whenA(isWeekday).replicateA(5)
+      _ <- IO.println("Offwork").unlessA(isWeekday)
+    } yield ()
+  }
+
+  test("right shark") {
+    (
+      (IO.sleep(100.millis) *> printCurrentThreadIO("1")) &>
+      (IO.sleep(200.millis) *> printCurrentThreadIO("2")) &>
+      (IO.sleep(300.millis) *> printCurrentThreadIO("3")) &>
+      (IO.sleep(400.millis) *> printCurrentThreadIO("4")) &>
+      (IO.sleep(500.millis) *> printCurrentThreadIO("5")) &>
+      (IO.sleep(600.millis) *> printCurrentThreadIO("6"))
+    ).timed >>= IO.println
+  }
+
+  test("rate limited") {
+    def rateLimited[F[_]: MonadCancelThrow, A](semaphore: Semaphore[F], func: => F[A]): F[A] =
+      semaphore.permit.use(_ => func)
+
+    val r = Supervisor[IO].use { supervisor =>
+      for {
+        s <- Semaphore[IO](5)
+        m <- supervisor.supervise(rateLimited(s, IO.sleep(2.second))).replicateA(6)
+        _ <- m.traverse(_.join)
+      } yield ()
+    }
+    r.timed >>= IO.println
+  }
+
   test("defer") {
     for {
       start <- IO.deferred[Boolean]
       done  <- IO.deferred[Boolean]
-      r <- (IO.println("1.ready") *>
+      _ <- (IO.println("1.ready") *>
         start.get *>
         IO.println("2.doing it") *>
         IO.sleep(2.seconds) *>
@@ -30,7 +63,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
         IO.sleep(2.seconds) *> IO.println("1.carry on ") *> start.complete(true) *> done.get *> IO
           .println("4.ok")
       }
-    } yield Passed
+    } yield ()
   }
 
   test("defer not completing") {
@@ -43,7 +76,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
     } yield assert(!r)
   }
 
-  test("ref updates should be idempotent, i.e. not effectful".only) {
+  test("ref updates should be idempotent, i.e. not effectful") {
     for {
       ref <- Ref[IO].of(0)
       _ <- Supervisor[IO].use { supervisor =>
@@ -55,6 +88,34 @@ object CatsSpec extends SimpleIOSuite with Checkers {
 
   test("parProduct") {
     IO.sleep(1.second).parProduct(IO.sleep(1.second)).void.map(_Passed)
+  }
+
+  test("parMapN") {
+    def makeIO(r: Long): IO[Long] = IO.sleep(r.seconds) *> IO.pure(r)
+
+    (makeIO(2), makeIO(4))
+      .parMapN {
+        case (m, n) => m + n
+      }
+      .timed
+      .flatTap {
+        case (t, _) => IO.println(t)
+      }
+      .map {
+        case (_, t) => t
+      }
+      .map(t => assert(t == 6))
+  }
+
+  test("parMapN fail") {
+    val dummyFailure = new Exception("dummy")
+    val ioA          = IO.sleep(2.seconds) *> IO(println("Delayed!"))
+    val ioB          = IO.raiseError[Unit](dummyFailure)
+
+    (ioA, ioB)
+      .parMapN((_, _) => ())
+      .map(_ => assert(false))
+      .handleError(err => assert(err eq dummyFailure))
   }
 
   test("1. LEAK: background") {
@@ -82,7 +143,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
     //basically, start exists as a primitive to support more complicated things
     val t2 = IO(1).background.use(_ => IO.unit).start.flatMap(_.cancel) //it's not a leak anymore
 
-    val m2 = (IO.println("hello") *> IO.sleep(1.second))
+    (IO.println("hello") *> IO.sleep(1.second))
       .flatMap(_ => IO.println("flatMap"))
       .guarantee(IO.println("guarantee"))
       .onCancel(IO.println("onCancel"))
@@ -91,7 +152,6 @@ object CatsSpec extends SimpleIOSuite with Checkers {
       .surround {
         IO.sleep(5.seconds)
       }
-    m2.map(_Passed)
   }
 
   test("ops >>(lazily evaluated) *>(strictly evaluated)") {
@@ -145,6 +205,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
         callback(1.asRight[Throwable])
         Applicative[F].pure(None) //cleanup function
       }
+
     myAsync[IO].map(i => assert(i == 1))
   }
 
@@ -161,18 +222,18 @@ object CatsSpec extends SimpleIOSuite with Checkers {
     for {
       f <- myAsync[IO].start
       _ <- f.cancel
-    } yield Passed
+    } yield ()
   }
 
   test("print current thread") {
     for {
-      f1 <- (printCurrentThreadIO >>
-        printCurrentThreadIO.evalOn(e1) >>
-        printCurrentThreadIO
+      f1 <- (printCurrentThreadIO() >>
+        printCurrentThreadIO().evalOn(e1) >>
+        printCurrentThreadIO()
           .evalOn(e2)
-          .map(_ => printCurrentThread())
+          .map(_ => unsafePrintCurrentThread())
           .evalOn(e3)
-          .map(_ => printCurrentThread()))
+          .map(_ => unsafePrintCurrentThread()))
         .startOn(e6)
       r1 <- f1.joinWithNever
     } yield Passed
@@ -220,6 +281,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
         case Right((fiberA, Outcome.Succeeded(b))) =>
           fiberA.cancel >> b
       }
+
     TestControl.execute(timeout[Int](IO.sleep(11 seconds) >> IO.pure(10), 10 seconds)) flatMap {
       control =>
         for {
@@ -236,6 +298,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
         case Left(()) => IO.raiseError[A](Timeout)
         case Right(a) => IO.pure(a)
       }
+
     val p1: IO[Expectations] = TestControl
       .execute(timeout[Int](IO.sleep(11 seconds) >> IO.pure(10), 10 seconds))
       .flatMap { control =>
@@ -262,7 +325,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
   loggedTest("ref") { log =>
     for {
       state  <- IO.ref(0)
-      fibers <- (state.update(_ + 1) >> printCurrentThreadIO).start.replicateA(100)
+      fibers <- (state.update(_ + 1) >> printCurrentThreadIO()).start.replicateA(100)
       _      <- fibers.traverse(_.join).void
       value  <- state.get
       _      <- log.debug(s"The final value is: $value")
@@ -285,6 +348,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
   test("run concurrently requires Concurrent") {
     def nice[F[_]: Concurrent]: F[Fiber[F, Throwable, Int]] =
       Concurrent[F].start(Applicative[F].pure(1))
+
     for {
       f <- nice[IO]
       r <- f.joinWithNever
@@ -294,6 +358,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
   test("run concurrently requires Spawn") {
     def nice[F[_]: Spawn]: F[Fiber[F, Throwable, Int]] =
       Spawn[F].start(Applicative[F].pure(1))
+
     for {
       f <- nice[IO]
       r <- f.joinWithNever
@@ -303,6 +368,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
   test("run concurrently requires Temporal") {
     def nice[F[_]: Temporal]: F[Fiber[F, Throwable, Int]] =
       Temporal[F].start(Applicative[F].pure(1))
+
     for {
       f <- nice[IO]
       r <- f.joinWithNever
@@ -385,6 +451,7 @@ object CatsSpec extends SimpleIOSuite with Checkers {
       Resource.make(IO.pure(name))(str => IO.println(s"releasing $str"))
 
     def read(name: String) = IO.pure(name).flatTap(str => IO.println(s"reading $str"))
+
     def write(name: String, data: String) =
       IO.pure(name).flatTap(str => IO.println(s"writing $str, $data"))
 

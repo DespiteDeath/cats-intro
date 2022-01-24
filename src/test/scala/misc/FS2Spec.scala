@@ -2,7 +2,8 @@ package misc
 
 import cats._
 import cats.effect._
-import cats.effect.std._
+import cats.effect.kernel.MonadCancel
+import cats.effect.std.{ Semaphore, Supervisor }
 import cats.implicits._
 import fs2._
 import weaver._
@@ -20,25 +21,51 @@ object FS2Spec extends SimpleIOSuite with Checkers {
         Applicative[F].pure(None) //cleanup
       }
 
-    val m: IO[Unit] = Stream((1 to 100).map(_.toString): _*)
+    Stream((1 to 100).map(_.toString): _*)
       .chunkN(10)
       .covary[IO]
       .parEvalMapUnordered(10)(writeToSocket[IO])
       .compile
       .drain
-
-    m.map(_ => assert(true))
   }
 
-  test("print start and end of a stream") {
-    val now: IO[Long]         = IO[Long](System.currentTimeMillis())
-    val m: Stream[Pure, Long] = Stream(1L, 2L, 3L, 4L, 5L)
+  test("parallel drain") {
+    val s: Stream[Pure, Long] = Stream.range(1L, 5L)
+    val compute: Stream[IO, Unit] =
+      s.parEvalMap[IO, Unit](10)(i => IO.sleep(i.seconds) *> printCurrentThreadIO())
 
-    val compute: Stream[IO, Unit] = m.parEvalMap[IO, Unit](10)(i => IO.sleep(i seconds))
-
-    now
-      .bracket(_ => compute.compile.drain)(start => now.map(_ - start).map(println))
-      .handleErrorWith(e => Console[IO].printStackTrace(e))
-      .map(_ => assert(true))
+    compute.compile.drain.timed.flatMap(IO.println)
   }
+
+  test("resource") {
+    Stream
+      .range(1, 10)
+      .covary[IO]
+      .compile
+      .resource
+      .toList
+      .use(IO.println)
+  }
+
+  test("scan1") {
+    val m = Stream.constant[IO, Int](1).scan1(_ + _)
+    m.take(10).compile.toList >>= IO.println
+  }
+
+  test("concurrently???") {
+    val data: Stream[IO, Int] = Stream.range(1, 10).covary[IO]
+    Stream
+      .eval(fs2.concurrent.SignallingRef[IO, Int](0))
+      .flatMap(s => Stream(s).concurrently(data.evalMap(s.set)))
+      .flatMap(_.discrete)
+      .takeWhile(_ < 9, takeFailure = true)
+      .compile
+      .last
+      .map(it => assert(it.contains(9)))
+  }
+
+  test("mics") {
+    Stream.eval(IO.println("hello")).compile.drain.void
+  }
+
 }
