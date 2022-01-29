@@ -88,8 +88,6 @@ object PingPong extends IOApp.Simple {
   override def run: IO[Unit] =
     clientAndServer.use {
       case (serverIO, client) =>
-        serverIO.flatMap {
-          handler[IO]("hello", _, client)
-        }
-    }.void
+        serverIO.flatMap(handler[IO]("hello", _, client))
+    } >>= IO.println
 }

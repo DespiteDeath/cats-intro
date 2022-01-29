@@ -9,6 +9,30 @@ import cats.implicits._
 
 import scala.concurrent.duration._
 
+object FS2Main {
+  import cats.effect.unsafe.implicits.global
+  import fs2._
+  import org.http4s._
+  import org.http4s.blaze.client._
+  import org.http4s.implicits._
+
+  def main(args: Array[String]): Unit = {
+    val simulation: IO[Unit] = BlazeClientBuilder[IO].resource.use { client =>
+      val req = Request[IO](
+        uri =
+          uri"https://???/private/healthcheck"
+      )
+      Stream
+        .awakeEvery[IO](1.second)
+        .zipRight(Stream.repeatEval(client.status(req)))
+        .evalMap(IO.println)
+        .compile
+        .drain
+    }
+    simulation.timeout(120.seconds).attempt.unsafeRunSync()
+  }
+}
+
 object ParTraverse extends IOApp {
   override def run(args: List[String]): IO[ExitCode] =
     NonEmptyList

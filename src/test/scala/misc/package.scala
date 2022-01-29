@@ -1,5 +1,5 @@
 import cats.Functor
-import cats.effect._
+import cats.effect.IO
 import cats.effect.std.Console
 import weaver.Expectations
 

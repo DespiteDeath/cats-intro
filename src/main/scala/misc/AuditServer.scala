@@ -86,8 +86,8 @@ object AuditServer extends IOApp {
             response <- Applicative[F].pure(Response(status = Status.Created).withEntity(model))
           } yield response
           response.handleErrorWith(error =>
-            Sync[F].blocking(error.printStackTrace()) >> MonadError[F, Throwable]
-              .raiseError[Response[F]](error)
+            Sync[F].blocking(error.printStackTrace()) >>
+            MonadError[F, Throwable].raiseError[Response[F]](error)
           )
       }
       .orNotFound

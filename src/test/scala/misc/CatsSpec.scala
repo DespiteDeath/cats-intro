@@ -15,6 +15,7 @@ import scala.concurrent.duration._
 /**
   * https://typelevel.org/blog/2020/10/30/concurrency-in-ce3.html
   * https://blog.rockthejvm.com/cats-effect-racing-fibers/
+  * http://beyondthelines.net/programming/cats-effect-an-overview/
   */
 object CatsSpec extends SimpleIOSuite with Checkers {
 
@@ -335,11 +336,11 @@ object CatsSpec extends SimpleIOSuite with Checkers {
   test("ref2") {
     Counter.make[IO].flatMap { c =>
       for {
-        _ <- c.get.flatMap(IO.println)
+        _ <- c.get >>= IO.println
         _ <- c.incr
-        _ <- c.get.flatMap(IO.println)
+        _ <- c.get >>= IO.println
         _ <- c.incr.replicateA(5).void
-        _ <- c.get.flatMap(IO.println)
+        _ <- c.get >>= IO.println
         k <- c.get
       } yield assert(k == 6)
     }

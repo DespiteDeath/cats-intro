@@ -52,9 +52,10 @@ lazy val root = (project in file(".")).settings(
       "org.typelevel"              %% "cats-free"                     % "2.7.0" withSources,
       "org.typelevel"              %% "cats-testkit-scalatest"        % "2.1.5"    % Test withSources,
       "org.typelevel"              %% "cats-effect"                   % "3.3.4" withSources,
-      "org.typelevel"              %% "cats-effect-std"               % "3.3.1" withSources,
+      "org.typelevel"              %% "cats-mtl"                      % "1.2.1" withSources,
+      "org.typelevel"              %% "cats-effect-std"               % "3.3.4" withSources,
       "org.typelevel"              %% "cats-effect-kernel"            % "3.3.4" withSources,
-      "org.typelevel"              %% "cats-effect-testkit"           % "3.3.1"    % Test withSources,
+      "org.typelevel"              %% "cats-effect-testkit"           % "3.3.4"    % Test withSources,
       "org.typelevel"              %% "cats-effect-testing-scalatest" % "1.4.0"    % Test withSources,
       "co.fs2"                     %% "fs2-core"                      % "3.2.4" withSources,
       "co.fs2"                     %% "fs2-io"                        % "3.2.4" withSources,
@@ -63,7 +64,7 @@ lazy val root = (project in file(".")).settings(
       "org.typelevel"              %% "simulacrum"                    % "1.0.1" withSources,
       "org.scalatest"              %% "scalatest"                     % "3.2.10"   % Test withSources,
       "org.scalatestplus"          %% "scalacheck-1-15"               % "3.2.10.0" % Test withSources,
-      "org.mockito"                %% "mockito-scala-scalatest"       % "1.16.49"  % Test withSources,
+      "org.mockito"                %% "mockito-scala-scalatest"       % "1.17.0"   % Test withSources,
       "org.scalacheck"             %% "scalacheck"                    % "1.15.4"   % Test withSources,
       "org.typelevel"              %% "scalacheck-effect"             % "1.0.3"    % Test withSources,
       "com.github.alexarchambault" %% "scalacheck-shapeless_1.15"     % "1.3.0"    % Test withSources,
@@ -80,7 +81,8 @@ lazy val root = (project in file(".")).settings(
       "com.ringcentral"            %% "cassandra4io"                  % "0.1.10" withSources,
       "com.disneystreaming"        %% "weaver-cats"                   % "0.7.9"    % Test withSources,
       "com.disneystreaming"        %% "weaver-scalacheck"             % "0.7.9"    % Test withSources,
-      "com.github.tomakehurst"      % "wiremock-jre8"                 % "2.32.0" withSources
+      "com.github.tomakehurst"      % "wiremock-jre8"                 % "2.32.0" withSources,
+      "ch.qos.logback"              % "logback-classic"               % "1.2.10"
     ),
   makeVersionProperties := {
     val propFile = (Compile / resourceManaged).value / "version.properties"
