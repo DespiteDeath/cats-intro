@@ -507,22 +507,6 @@ object CatsSpec extends SimpleIOSuite with Checkers {
     contravariant(List(true, false)).flatMap(IO.println(_)).map(_Passed)
   }
 
-  test("contravariant box") {
-    trait Box[-T] {
-      def m(t: T): Unit
-    }
-    implicit object ContravariantForBox extends Contravariant[Box] {
-      override def contramap[A, B](fa: Box[A])(f: B => A): Box[B] = (b: B) => fa.m(f(b))
-    }
-    object BoxInt extends Box[Int] {
-      override def m(t: Int): Unit = println(t)
-    }
-    val boxBoolean: Box[Boolean] =
-      Contravariant[Box].contramap(BoxInt)((b: Boolean) => if (b) 1 else 0)
-    boxBoolean.m(false)
-    IO(Passed)
-  }
-
   test("random1") {
     def dieRoll[F[_]: Functor: Random]: F[Int] =
       Random[F].betweenInt(0, 6).map(_ + 1) // `6` is excluded from the range

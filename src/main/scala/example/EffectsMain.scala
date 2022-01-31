@@ -19,8 +19,7 @@ object FS2Main {
   def main(args: Array[String]): Unit = {
     val simulation: IO[Unit] = BlazeClientBuilder[IO].resource.use { client =>
       val req = Request[IO](
-        uri =
-          uri"https://???/private/healthcheck"
+        uri = uri"https://???/private/healthcheck"
       )
       Stream
         .awakeEvery[IO](1.second)

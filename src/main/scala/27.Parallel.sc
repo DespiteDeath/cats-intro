@@ -1,5 +1,5 @@
 import cats.data._
-import cats.effect.{ExitCode, IO}
+import cats.effect.IO
 import cats.implicits._
 import example.putStrLine
 

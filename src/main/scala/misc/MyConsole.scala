@@ -30,7 +30,7 @@ object MyConsole {
 
     class ConsoleRef[F[_]: Applicative](val ref: MyRef[F]) extends MyConsole[F] {
       override def printLn(string: String): F[Unit] = ref.update(_ :+ string)
-      override def readLn(): F[String] = Applicative[F].pure("test")
+      override def readLn(): F[String]              = Applicative[F].pure("test")
     }
 
     object ConsoleRef {
@@ -42,7 +42,7 @@ object MyConsole {
   object sync {
     class ConsoleSync[F[_]: Sync] extends MyConsole[F] {
       override def printLn(string: String): F[Unit] = Sync[F].delay(println(string))
-      override def readLn(): F[String] = Sync[F].delay(scala.io.StdIn.readLine())
+      override def readLn(): F[String]              = Sync[F].delay(scala.io.StdIn.readLine())
     }
   }
 

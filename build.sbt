@@ -27,19 +27,21 @@ val defaultScalaOptions = Seq(
   //"-Xlint", // enable handy linter warnings
   //"-Xfatal-warnings", // turn compiler warnings into errors
   "-Yrangepos",
-  "-Ymacro-annotations"
+  "-Ymacro-annotations",
+  "-Vimplicits",            //https://github.com/tek/splain
+  "-Vtype-diffs"            //https://github.com/tek/splain
 )
 
-val kindProjector    = addCompilerPlugin("org.typelevel" % "kind-projector_2.13.6" % "0.13.2")
+val kindProjector    = addCompilerPlugin("org.typelevel" % "kind-projector_2.13.8" % "0.13.2")
 val betterMonadicFor = addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
 val compilerPlugins  = Seq(kindProjector, betterMonadicFor)
 
 val defaultSettings = Seq(
     version := "0.1",
-    scalaVersion := "2.13.6",
+    scalaVersion := "2.13.8",
     organization := "org.inanme",
     semanticdbEnabled := true,
-    semanticdbVersion := "4.4.18",
+    semanticdbVersion := "4.4.35",
     testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
     scalacOptions ++= defaultScalaOptions
   ) ++ compilerPlugins

@@ -46,7 +46,6 @@ class KeepEmptySpec
     import scala.util.chaining._
     implicit val exc = ExecutionContext.fromExecutor(_.run())
 
-
   }
 
 }

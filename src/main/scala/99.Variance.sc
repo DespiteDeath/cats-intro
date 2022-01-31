@@ -20,6 +20,12 @@ class Award[+T](val recipient: T)              //co, +, extends, Generalize, up,
 class Problem[-T](recipient: T)                //contra, -, super,  Specialize, down, put, sink
 class Action1[+T <: Manager](val recipient: T) //Specialize < extends down
 class Action2[-T >: Manager](recipient: T)     //Generalize > super up
+trait JsonWriter[-T] {
+  def write(value: T): Unit = ???
+}
+trait JsonReader[+T] {
+  def write(value: String): T = ???
+}
 
 // Function[-A, +B]
 val f1: Function[Manager, Manager] = _ => new CEO
@@ -29,6 +35,8 @@ val ea: Award[Emp] = new Award[Manager](new Manager)
 //val ca: Award[CEO] = new Award[Manager](new Manager)
 
 val ep: Problem[Manager] = new Problem[Emp](new Manager)
+val jw: JsonWriter[Manager] = new JsonWriter[Emp] {}
+val jr: JsonReader[Emp] = new JsonReader[Manager] {}
 
 val action1: Action1[Manager] = new Action1[CEO](new CEO)
 val action2: Action2[Manager] = new Action2[Emp](new Emp)

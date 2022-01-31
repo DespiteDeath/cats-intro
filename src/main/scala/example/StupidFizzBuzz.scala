@@ -1,6 +1,6 @@
 package example
 
-import cats.effect.{IO, IOApp}
+import cats.effect.{ IO, IOApp }
 import scala.concurrent.duration._
 
 // obviously this isn't actually the problem definition, but it's kinda fun

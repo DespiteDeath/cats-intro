@@ -12,7 +12,7 @@ def f(i: Int): Future[Int] =
     else i
   }
 
-val fs = Range(0, 10).map(f)
+val fs = Iterator.range(0, 10).map(f)
 
 fs.foldLeft(Future.successful((List.empty[Throwable], List.empty[Int]))) { (acc, elem) =>
   val m = for {

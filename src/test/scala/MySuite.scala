@@ -1,4 +1,4 @@
-import cats.effect.{IO, SyncIO}
+import cats.effect.{ IO, SyncIO }
 import munit.CatsEffectSuite
 
 class ExampleSuite extends CatsEffectSuite {

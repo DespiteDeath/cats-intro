@@ -137,7 +137,7 @@ object FS2Spec extends SimpleIOSuite {
       } >>= IO.println
   }
 
-  test("SignallingRef".only) {
+  test("SignallingRef") {
     SignallingRef[IO, Boolean](false).flatMap { signal =>
       val s1 = Stream.awakeEvery[IO](1.second).interruptWhen(signal)
       val s2 = Stream.sleep[IO](4.seconds) >> Stream.eval(signal.set(true))
@@ -166,6 +166,37 @@ object FS2Spec extends SimpleIOSuite {
       .drain
   }
 
+  test("separate") {
+    def k(k: Int): IO[Int] =
+      IO {
+        if (k % 2 == 0) throw new RuntimeException(k.toString)
+        else k
+      }
+
+    val r: IO[(List[Throwable], List[Int])] = Stream
+      .range(1, 10)
+      .parEvalMap[IO, Either[Throwable, Int]](2)(i =>
+        k(i).map(_.asRight[Throwable]).handleError(_.asLeft)
+      )
+      .compile
+      .toList
+      .map(_.separate)
+
+    r.map {
+      case (es, ss) =>
+        expect(es.map(_.getMessage.toInt) == List(2, 4, 6, 8)) and expect(ss == List(1, 3, 5, 7, 9))
+    }
+  }
+
+  test("flatMap-through".only) {
+    val r1                = Stream.range(1, 10).covary[IO]
+    val s1: IO[List[Int]] = r1.flatMap(i => Stream(i + 1)).compile.toList
+    val s2: IO[List[Int]] = r1.through(_.map(_ + 1)).compile.toList
+
+    s1.map(s => expect(s == Iterator.range(2, 11).toList)) |+|
+    s2.map(s => expect(s == Iterator.range(2, 11).toList))
+  }
+
   test("mics1") {
     (
       Stream(1, 2, 3).covary[IO] ++
@@ -180,7 +211,6 @@ object FS2Spec extends SimpleIOSuite {
   }
 
   test("mics3") {
-
     IO.unit
   }
 
@@ -204,4 +234,16 @@ object FS2Spec extends SimpleIOSuite {
     IO.unit
   }
 
+  test("mics8") {
+
+    IO.unit
+  }
+  test("mics9") {
+
+    IO.unit
+  }
+  test("mics10") {
+
+    IO.unit
+  }
 }

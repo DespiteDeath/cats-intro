@@ -50,7 +50,6 @@ object FieldValidation {
     List(tooLong, tooShort).reduce(_ <* _)
   }
 
-
   def validatePassword(password: String): ValidatedNel[FieldValidationError, String] = {
     val tooShort = Validated.condNel[FieldValidationError, String](
       password.length >= 10,
